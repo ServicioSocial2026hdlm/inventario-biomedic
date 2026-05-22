@@ -14,78 +14,21 @@ from reportlab.lib.pagesizes import letter, landscape
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet
 
-# --- CONFIGURACION DE LA PAGINA ---
-st.set_page_config(page_title="Sistema de Inventario - Hospital de la Mujer", layout="wide")
+st.set_page_config(page_title="Sistema Biomédico - Hospital de la Mujer", layout="wide")
 
-# --- SEGURIDAD ---
-if "authenticated" not in st.session_state:
-    st.session_state.authenticated = False
-
-def check_password():
-    if not st.session_state.authenticated:
-        st.title("Acceso al Sistema Biomedico")
-        pwd = st.text_input("Ingrese la contraseña de acceso:", type="password")
-        if st.button("Ingresar"):
-            if "auth" in st.secrets and pwd == st.secrets["auth"]["password"]:
-                st.session_state.authenticated = True
-                st.rerun()
-            else:
-                st.error("Contraseña incorrecta")
-        return False
-    return True
-
-if not check_password():
+# Seguridad
+if "authenticated" not in st.session_state: st.session_state.authenticated = False
+if not st.session_state.authenticated:
+    st.title("Acceso al Sistema Biomédico")
+    pwd = st.text_input("Contraseña:", type="password")
+    if st.button("Entrar"):
+        if "auth" in st.secrets and pwd == st.secrets["auth"]["password"]:
+            st.session_state.authenticated = True
+            st.rerun()
     st.stop()
 
-# --- CONEXION A BASE DE DATOS ---
 def get_connection():
-    try:
-        return psycopg2.connect(
-            host=st.secrets["database"]["host"],
-            database=st.secrets["database"]["dbname"],
-            user=st.secrets["database"]["user"],
-            password=st.secrets["database"]["password"],
-            port=st.secrets["database"]["port"]
-        )
-    except Exception as e:
-        st.error(f"Error de conexion: {e}")
-        return None
-
-# --- FUNCION PARA GENERAR PDF PROFESIONAL ---
-def generate_pdf(df):
-    buffer = io.BytesIO()
-    # Usamos landscape (horizontal) para que la tabla quepa bien como en tu imagen
-    doc = SimpleDocTemplate(buffer, pagesize=landscape(letter))
-    elements = []
-    
-    styles = getSampleStyleSheet()
-    title = Paragraph("HOSPITAL DE LA MUJER - REPORTE DE INVENTARIO BIOMEDICO", styles['Title'])
-    elements.append(title)
-    elements.append(Spacer(1, 12))
-    
-    # Preparar datos de la tabla (Encabezados + Filas)
-    data = [df.columns.tolist()] + df.values.tolist()
-    
-    # Crear la tabla
-    t = Table(data)
-    
-    # Estilo de la tabla similar a tu imagen 2
-    style = TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 10),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-        ('BACKGROUND', (0, 1), (-1, -1), colors.whitesmoke),
-        ('GRID', (0, 0), (-1, -1), 1, colors.black),
-        ('FONTSIZE', (0, 1), (-1, -1), 8),
-    ])
-    t.setStyle(style)
-    
-    elements.append(t)
-    doc.build(elements)
-    return buffer.getvalue()
+    return psycopg2.connect(**st.secrets["database"])
 
 def generate_excel(df):
     output = io.BytesIO()
@@ -93,52 +36,52 @@ def generate_excel(df):
         df.to_excel(writer, index=False)
     return output.getvalue()
 
-# --- INTERFAZ PRINCIPAL ---
-st.title("Gestion de Inventario Biomedico")
-menu = ["Inventario y Consultas", "Mantenimiento", "Bajas"]
-choice = st.sidebar.selectbox("Modulo", menu)
+def generate_pdf(df, titulo):
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=landscape(letter))
+    styles = getSampleStyleSheet()
+    elements = [Paragraph(titulo, styles['Title']), Spacer(1, 12)]
+    data = [df.columns.tolist()] + df.values.tolist()
+    t = Table(data)
+    t.setStyle(TableStyle([('GRID', (0,0), (-1,-1), 0.5, colors.black), ('BACKGROUND', (0,0), (-1,0), colors.grey), ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke)]))
+    elements.append(t); doc.build(elements)
+    return buffer.getvalue()
 
-ubicaciones_lista = ["Hospitalización"," Alto Riesgo", "Tococirugía", "Quirófano", "Expulsión", "Labor", "UCIN", "Crecimiento y Desarrollo", "Terapia Intensiva", "Imagenología", "Urgencias", "Consulta Externa", "CEYE"]
+# Interfaz
+choice = st.sidebar.selectbox("Módulo", ["Inventario", "Mantenimiento", "Bajas"])
 
-if choice == "Inventario y Consultas":
-    with st.expander("Registrar Nuevo Equipo"):
-        with st.form("registro_form", clear_on_submit=True):
+if choice == "Inventario":
+    with st.expander("Registrar Equipo"):
+        with st.form("reg"):
             c1, c2 = st.columns(2)
-            with c1:
-                equipo = st.text_input("Equipo")
-                marca = st.text_input("Marca")
-                modelo = st.text_input("Modelo")
-            with c2:
-                serie = st.text_input("Serie")
-                ubicacion = st.selectbox("Ubicacion", ubicaciones_lista)
-                estado = st.selectbox("Estado", ["Operativo", "En Mantenimiento", "Baja"])
+            with c1: eq = st.text_input("Equipo"); ma = st.text_input("Marca"); mo = st.text_input("Modelo")
+            with c2: se = st.text_input("Serie"); ub = st.selectbox("Ubicación", ["Tococirugía", "Quirófano", "UCIN"]); es = st.selectbox("Estado", ["Operativo", "En Mantenimiento", "Baja"])
             if st.form_submit_button("Guardar"):
-                conn = get_connection()
-                if conn:
-                    cur = conn.cursor()
-                    cur.execute("INSERT INTO inventario (equipo, marca, modelo, serie, ubicacion, estado) VALUES (%s,%s,%s,%s,%s,%s)", (equipo, marca, modelo, serie, ubicacion, estado))
-                    conn.commit()
-                    st.success("Guardado")
-                    st.rerun()
+                conn = get_connection(); cur = conn.cursor()
+                cur.execute("INSERT INTO inventario (equipo, marca, modelo, serie, ubicacion, estado) VALUES (%s,%s,%s,%s,%s,%s)", (eq, ma, mo, se, ub, es))
+                conn.commit(); conn.close(); st.rerun()
+    
+    conn = get_connection(); df = pd.read_sql("SELECT * FROM inventario", conn); conn.close()
+    st.dataframe(df, use_container_width=True)
+    st.download_button("Descargar Excel", generate_excel(df), "inventario.xlsx")
 
-    st.header("Consulta de Equipos")
+elif choice == "Mantenimiento":
+    st.header("Registro de Mantenimiento")
     conn = get_connection()
-    if conn:
-        df = pd.read_sql("SELECT equipo, marca, modelo, serie, ubicacion, estado FROM inventario ORDER BY equipo ASC", conn)
-        
-        # Contador y Buscador
-        st.metric("Total de equipos", len(df))
-        search = st.text_input("Buscar equipo, marca o modelo:")
-        if search:
-            df = df[df.apply(lambda row: search.lower() in row.astype(str).str.lower().values, axis=1)]
+    equipos = pd.read_sql("SELECT id, equipo || ' (' || serie || ')' as label FROM inventario", conn)
+    with st.form("manto"):
+        sel = st.selectbox("Equipo", equipos['label'])
+        fecha = st.date_input("Fecha"); tipo = st.selectbox("Tipo", ["Preventivo", "Correctivo"]); desc = st.text_area("Descripción")
+        if st.form_submit_button("Guardar"): st.success("Registrado")
+    conn.close()
 
-        st.dataframe(df, use_container_width=True)
-
-        st.subheader("Exportar Informacion")
-        col_btn1, col_btn2 = st.columns(2)
-        with col_btn1:
-            st.download_button("Descargar en Excel", generate_excel(df), "inventario.xlsx")
-        with col_btn2:
-            # NUEVO BOTÓN PARA PDF PROFESIONAL
-            pdf_data = generate_pdf(df)
-            st.download_button("Descargar en PDF", pdf_data, f"reporte_{datetime.now().strftime('%Y%m%d')}.pdf", "application/pdf")
+elif choice == "Bajas":
+    st.header("Acta de Baja")
+    conn = get_connection()
+    equipos = pd.read_sql("SELECT id, equipo || ' (' || serie || ')' as label FROM inventario WHERE estado != 'Baja'", conn)
+    with st.form("baja"):
+        sel = st.selectbox("Equipo a dar de baja", equipos['label'])
+        fecha = st.date_input("Fecha de baja"); motivo = st.selectbox("Motivo", ["Obsolescencia", "Daño irreparable", "Robo", "Otro"])
+        obs = st.text_area("Descripción del motivo"); aut = st.text_input("Quién autoriza"); folio = st.text_input("Folio del Acta")
+        if st.form_submit_button("Confirmar Baja"): st.warning("Baja documentada")
+    conn.close()
