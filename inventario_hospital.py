@@ -9,21 +9,21 @@ import pandas as pd
 import psycopg2
 import io
 from datetime import datetime
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import letter, landscape
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet
 
 # --- CONFIGURACION DE LA PAGINA ---
-st.set_page_config(
-    page_title="Sistema de Inventario - Hospital de la Mujer",
-    layout="wide"
-)
+st.set_page_config(page_title="Sistema de Inventario - Hospital de la Mujer", layout="wide")
 
-# --- SEGURIDAD Y ACCESO ---
+# --- SEGURIDAD ---
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
 
 def check_password():
     if not st.session_state.authenticated:
         st.title("Acceso al Sistema Biomedico")
-        st.write("Hospital de la Mujer - Aguascalientes")
         pwd = st.text_input("Ingrese la contraseña de acceso:", type="password")
         if st.button("Ingresar"):
             if "auth" in st.secrets and pwd == st.secrets["auth"]["password"]:
@@ -51,100 +51,94 @@ def get_connection():
         st.error(f"Error de conexion: {e}")
         return None
 
-# --- FUNCION PARA EXCEL ---
+# --- FUNCION PARA GENERAR PDF PROFESIONAL ---
+def generate_pdf(df):
+    buffer = io.BytesIO()
+    # Usamos landscape (horizontal) para que la tabla quepa bien como en tu imagen
+    doc = SimpleDocTemplate(buffer, pagesize=landscape(letter))
+    elements = []
+    
+    styles = getSampleStyleSheet()
+    title = Paragraph("HOSPITAL DE LA MUJER - REPORTE DE INVENTARIO BIOMEDICO", styles['Title'])
+    elements.append(title)
+    elements.append(Spacer(1, 12))
+    
+    # Preparar datos de la tabla (Encabezados + Filas)
+    data = [df.columns.tolist()] + df.values.tolist()
+    
+    # Crear la tabla
+    t = Table(data)
+    
+    # Estilo de la tabla similar a tu imagen 2
+    style = TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.whitesmoke),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ('FONTSIZE', (0, 1), (-1, -1), 8),
+    ])
+    t.setStyle(style)
+    
+    elements.append(t)
+    doc.build(elements)
+    return buffer.getvalue()
+
 def generate_excel(df):
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-        df.to_excel(writer, index=False, sheet_name='Inventario')
+        df.to_excel(writer, index=False)
     return output.getvalue()
 
 # --- INTERFAZ PRINCIPAL ---
 st.title("Gestion de Inventario Biomedico")
-st.write("Departamento de Ingenieria Clinica")
-
 menu = ["Inventario y Consultas", "Mantenimiento", "Bajas"]
-choice = st.sidebar.selectbox("Seleccione Modulo", menu)
+choice = st.sidebar.selectbox("Modulo", menu)
 
-# Unico campo desplegable solicitado
-ubicaciones_lista = [
-    "Hospitalización", "Alto Riesgo", "Tococirugía", "Quirófano", "Expulsión", 
-    "Labor", "UCIN", "Crecimiento y Desarrollo", "Terapia Intensiva", 
-    "Imagenología", "Urgencias", "Consulta Externa", "CEYE"
-]
+ubicaciones_lista = ["Hospitalización"," Alto Riesgo", "Tococirugía", "Quirófano", "Expulsión", "Labor", "UCIN", "Crecimiento y Desarrollo", "Terapia Intensiva", "Imagenología", "Urgencias", "Consulta Externa", "CEYE"]
 
 if choice == "Inventario y Consultas":
-    
-    # --- FORMULARIO DE REGISTRO ---
-    with st.expander("Registrar Nuevo Equipo", expanded=False):
+    with st.expander("Registrar Nuevo Equipo"):
         with st.form("registro_form", clear_on_submit=True):
-            col1, col2 = st.columns(2)
-            with col1:
-                equipo = st.text_input("Equipo (ej. Incubadora)")
-                marca = st.text_input("Marca")
-                modelo = st.text_input("Modelo")
-            with col2:
-                serie = st.text_input("Numero de Serie")
-                ubicacion = st.selectbox("Ubicacion", ubicaciones_lista)
-                estado = st.selectbox("Estado Actual", ["Operativo", "En Mantenimiento", "Fuera de Servicio"])
-            
-            if st.form_submit_button("Guardar Registro"):
-                if equipo and serie:
-                    conn = get_connection()
-                    if conn:
-                        cur = conn.cursor()
-                        query = "INSERT INTO inventario (equipo, marca, modelo, serie, ubicacion, estado) VALUES (%s, %s, %s, %s, %s, %s)"
-                        cur.execute(query, (equipo, marca, modelo, serie, ubicacion, estado))
-                        conn.commit()
-                        cur.close()
-                        conn.close()
-                        st.success("Registro guardado exitosamente")
-                        st.rerun()
-                else:
-                    st.warning("Complete el nombre del equipo y serie para continuar")
-
-    st.divider()
-
-    # --- TABLA DE CONSULTAS Y BUSQUEDA ---
-    st.header("Consulta de Equipos")
-    
-    conn = get_connection()
-    if conn:
-        # Ordenar por equipo y marca de la A a la Z
-        query_sql = "SELECT equipo, marca, modelo, serie, ubicacion, estado FROM inventario ORDER BY equipo ASC, marca ASC"
-        df = pd.read_sql(query_sql, conn)
-        conn.close()
-
-        if not df.empty:
-            # Contador de equipos
-            st.metric("Total de equipos registrados", len(df))
-            
-            # Buscador
-            search = st.text_input("Buscar equipo, marca o modelo:")
-            if search:
-                df = df[df.apply(lambda row: search.lower() in row.astype(str).str.lower().values, axis=1)]
-
-            # Tabla principal ordenada
-            st.dataframe(df, use_container_width=True)
-
-            # Botones de descarga
-            st.subheader("Exportar Informacion")
             c1, c2 = st.columns(2)
             with c1:
-                excel_file = generate_excel(df)
-                st.download_button(
-                    label="Descargar en Excel",
-                    data=excel_file,
-                    file_name=f"inventario_hospital_{datetime.now().strftime('%Y%m%d')}.xlsx"
-                )
+                equipo = st.text_input("Equipo")
+                marca = st.text_input("Marca")
+                modelo = st.text_input("Modelo")
             with c2:
-                st.write("Para PDF: Presione Ctrl+P y guarde como archivo PDF desde el navegador.")
-        else:
-            st.info("No hay datos registrados en el sistema.")
+                serie = st.text_input("Serie")
+                ubicacion = st.selectbox("Ubicacion", ubicaciones_lista)
+                estado = st.selectbox("Estado", ["Operativo", "En Mantenimiento", "Baja"])
+            if st.form_submit_button("Guardar"):
+                conn = get_connection()
+                if conn:
+                    cur = conn.cursor()
+                    cur.execute("INSERT INTO inventario (equipo, marca, modelo, serie, ubicacion, estado) VALUES (%s,%s,%s,%s,%s,%s)", (equipo, marca, modelo, serie, ubicacion, estado))
+                    conn.commit()
+                    st.success("Guardado")
+                    st.rerun()
 
-elif choice == "Mantenimiento":
-    st.header("Modulo de Mantenimiento")
-    st.write("Espacio destinado para el historial de servicios preventivos y correctivos.")
+    st.header("Consulta de Equipos")
+    conn = get_connection()
+    if conn:
+        df = pd.read_sql("SELECT equipo, marca, modelo, serie, ubicacion, estado FROM inventario ORDER BY equipo ASC", conn)
+        
+        # Contador y Buscador
+        st.metric("Total de equipos", len(df))
+        search = st.text_input("Buscar equipo, marca o modelo:")
+        if search:
+            df = df[df.apply(lambda row: search.lower() in row.astype(str).str.lower().values, axis=1)]
 
-elif choice == "Bajas":
-    st.header("Control de Bajas")
-    st.write("Registro de equipos desincorporados por obsolescencia o daño.")
+        st.dataframe(df, use_container_width=True)
+
+        st.subheader("Exportar Informacion")
+        col_btn1, col_btn2 = st.columns(2)
+        with col_btn1:
+            st.download_button("Descargar en Excel", generate_excel(df), "inventario.xlsx")
+        with col_btn2:
+            # NUEVO BOTÓN PARA PDF PROFESIONAL
+            pdf_data = generate_pdf(df)
+            st.download_button("Descargar en PDF", pdf_data, f"reporte_{datetime.now().strftime('%Y%m%d')}.pdf", "application/pdf")
