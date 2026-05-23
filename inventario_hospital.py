@@ -15,6 +15,13 @@ from reportlab.lib.styles import getSampleStyleSheet
 
 st.set_page_config(layout="wide", page_title="Sistema Biomédico HDLM")
 
+# --- CONEXIÓN PWA (PARA INSTALAR LA APP) ---
+st.markdown("""
+    <link rel="manifest" href="manifest.json">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+""", unsafe_allow_html=True)
+
 # --- FUNCIONES DE REPORTES ---
 def get_connection(): return psycopg2.connect(**st.secrets["database"])
 
