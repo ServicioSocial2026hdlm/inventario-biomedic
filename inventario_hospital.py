@@ -90,60 +90,27 @@ elif choice == "Mantenimiento":
     st.dataframe(df, use_container_width=True)
 
 elif choice == "Bajas":
-    st.header("Control de Bajas")
-    import datetime 
-
+    st.header("Control de Bajas - Diagnóstico")
+    
     conn = get_connection()
-    df = pd.read_sql("SELECT * FROM inventario WHERE estado != 'Baja'", conn)
-    conn.close()
-
-    if not df.empty:
-        with st.form("form_baja_completo"):
-            st.subheader("📝 Datos del Equipo a dar de baja")
-            seleccion = st.selectbox("Seleccione el equipo", df["equipo"] + " - " + df["serie"])
-            equipo_sel = df[df["equipo"] + " - " + df["serie"] == seleccion].iloc[0]
-            
-            c1, c2 = st.columns(2)
-            with c1:
-                motivo = st.text_input("Motivo de la baja")
-                obs = st.text_area("Descripción detallada del motivo")
-                autorizado = st.text_input("Autorizado por")
-            with c2:
-                destino = st.text_input("Destino del equipo")
-                folio = st.text_input("Folio de acta")
-                fecha_acta = st.date_input("Fecha del acta")
-                valor_res = st.number_input("Valor residual", min_value=0.0, format="%.2f")
-
-            if st.form_submit_button("🔴 Confirmar Baja Definitiva"):
-                try:
-                    conn = get_connection()
-                    cur = conn.cursor()
-                    
-                    # Actualizar estado
-                    cur.execute("UPDATE inventario SET estado='Baja' WHERE id=%s", (int(equipo_sel['id']),))
-                    
-                    # INSERT usando comillas dobles para forzar el nombre de la columna
-                    # Esto evita errores si Postgres interpretó el nombre de forma sensible
-                    sql_insert = """INSERT INTO bajas 
-                    ("equipo_info", "fecha_baja", "motivo", "descripcion_motivo", "quien_autorizo", "destino", "folio_acta", "fecha_acta", "valor_residual") 
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)"""
-                    
-                    cur.execute(sql_insert, (
-                        f"{equipo_sel['equipo']} {equipo_sel['marca']}", 
-                        datetime.date.today(), 
-                        motivo, 
-                        obs, 
-                        autorizado, 
-                        destino, 
-                        folio, 
-                        fecha_acta, 
-                        valor_res
-                    ))
-                    
-                    conn.commit()
-                    cur.close()
-                    conn.close()
-                    st.success("¡Baja procesada con éxito!")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Error de base de datos: {e}")
+    try:
+        # Consultamos los nombres exactos de las columnas en la tabla 'bajas'
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'bajas' 
+            ORDER BY ordinal_position;
+        """)
+        columnas = [row[0] for row in cur.fetchall()]
+        
+        st.write("### Estructura detectada en la tabla 'bajas':")
+        st.write(columnas)
+        
+        if not columnas:
+            st.error("¡ERROR! La tabla 'bajas' no existe o no tiene columnas. Revisa si se llama diferente (ej: 'baja' en singular).")
+        
+    except Exception as e:
+        st.error(f"Error al conectar o leer la tabla: {e}")
+    finally:
+        conn.close()
