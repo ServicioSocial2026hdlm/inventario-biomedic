@@ -92,40 +92,47 @@ elif choice == "Mantenimiento":
 elif choice == "Bajas":
     st.header("Control de Bajas")
     
-    # 1. Obtener datos actuales del inventario
+    # 1. Obtener equipos activos
     conn = get_connection()
-    df = pd.read_sql("SELECT id, equipo, marca, serie, estado FROM inventario", conn)
+    df = pd.read_sql("SELECT * FROM inventario WHERE estado != 'Baja'", conn)
     conn.close()
 
-    # 2. Lógica para filtrar solo equipos activos
-    equipos_para_baja = df[df["estado"] != "Baja"]
-
-    if not equipos_para_baja.empty:
-        with st.form("baja_form"):
-            st.subheader("❌ Retiro de Equipo")
-            # Creamos una lista combinada para el selectbox
-            opciones = equipos_para_baja["id"].astype(str) + " - " + equipos_para_baja["equipo"] + " (" + equipos_para_baja["serie"] + ")"
-            sel_b = st.selectbox("Seleccione el equipo para dar de baja:", opciones)
-            motivo = st.text_input("Motivo de la baja")
+    if not df.empty:
+        with st.form("form_baja_completo"):
+            st.subheader("📝 Datos del Equipo a dar de baja")
+            # Seleccionar equipo
+            seleccion = st.selectbox("Seleccione el equipo", df["equipo"] + " - " + df["serie"])
             
-            if st.form_submit_button("🔴 Confirmar Baja"):
-                id_b = sel_b.split(" - ")[0] # Extraemos solo el ID
+            # Buscamos el equipo seleccionado en el dataframe
+            equipo_seleccionado = df[df["equipo"] + " - " + df["serie"] == seleccion].iloc[0]
+            
+            # Mostramos los datos actuales (solo lectura para confirmar)
+            c1, c2 = st.columns(2)
+            with c1:
+                st.write(f"**Marca:** {equipo_seleccionado['marca']}")
+                st.write(f"**Modelo:** {equipo_seleccionado['modelo']}")
+            with c2:
+                st.write(f"**Serie:** {equipo_seleccionado['serie']}")
+                st.write(f"**Ubicación:** {equipo_seleccionado['ubicacion']}")
+            
+            # Datos adicionales de la baja
+            motivo = st.text_input("Motivo de la baja")
+            autorizado = st.text_input("Autorizado por")
+            destino = st.text_input("Destino del equipo (ej. Almacén, Desecho)")
+
+            if st.form_submit_button("🔴 Confirmar Baja Definitiva"):
                 conn = get_connection()
                 cur = conn.cursor()
-                # Actualizamos el estado en la base de datos
-                sql_baja = "UPDATE inventario SET estado='Baja', marca = %s WHERE id=%s"
-                cur.execute(sql_baja, (f"Baja: {motivo}", id_b))
+                # 1. Marcamos como Baja en inventario
+                cur.execute("UPDATE inventario SET estado='Baja' WHERE id=%s", (int(equipo_seleccionado['id']),))
+                # 2. Guardamos registro histórico en la tabla de bajas
+                sql_insert = """INSERT INTO bajas (equipo_info, fecha_baja, motivo, quien_autorizo, destino) 
+                                VALUES (%s, CURRENT_DATE, %s, %s, %s)"""
+                cur.execute(sql_insert, (f"{equipo_seleccionado['equipo']} {equipo_seleccionado['marca']} {equipo_seleccionado['modelo']}", 
+                                         motivo, autorizado, destino))
                 conn.commit()
                 conn.close()
-                st.success("Equipo dado de baja correctamente.")
+                st.success("¡Baja procesada con éxito!")
                 st.rerun()
     else:
-        st.info("No hay equipos activos disponibles para dar de baja.")
-
-    # 3. Tabla de visualización
-    st.divider()
-    st.subheader("📋 Estado del Inventario")
-    conn = get_connection()
-    df_full = pd.read_sql("SELECT * FROM inventario", conn)
-    conn.close()
-    st.dataframe(df_full, use_container_width=True)
+        st.info("No hay equipos activos disponibles.")
