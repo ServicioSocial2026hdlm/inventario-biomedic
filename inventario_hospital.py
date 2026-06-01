@@ -92,6 +92,9 @@ elif choice == "Mantenimiento":
 elif choice == "Bajas":
     st.header("Control de Bajas")
     
+    # Asegúrate de importar 'import datetime' al principio de tu archivo
+    import datetime 
+
     # 1. Obtener equipos activos
     conn = get_connection()
     df = pd.read_sql("SELECT * FROM inventario WHERE estado != 'Baja'", conn)
@@ -100,39 +103,63 @@ elif choice == "Bajas":
     if not df.empty:
         with st.form("form_baja_completo"):
             st.subheader("📝 Datos del Equipo a dar de baja")
-            # Seleccionar equipo
+            
+            # Selección de equipo
             seleccion = st.selectbox("Seleccione el equipo", df["equipo"] + " - " + df["serie"])
+            equipo_sel = df[df["equipo"] + " - " + df["serie"] == seleccion].iloc[0]
             
-            # Buscamos el equipo seleccionado en el dataframe
-            equipo_seleccionado = df[df["equipo"] + " - " + df["serie"] == seleccion].iloc[0]
-            
-            # Mostramos los datos actuales (solo lectura para confirmar)
+            # Formulario detallado
             c1, c2 = st.columns(2)
             with c1:
-                st.write(f"**Marca:** {equipo_seleccionado['marca']}")
-                st.write(f"**Modelo:** {equipo_seleccionado['modelo']}")
+                motivo = st.text_input("Motivo de la baja")
+                obs = st.text_area("Descripción detallada del motivo")
+                autorizado = st.text_input("Autorizado por")
             with c2:
-                st.write(f"**Serie:** {equipo_seleccionado['serie']}")
-                st.write(f"**Ubicación:** {equipo_seleccionado['ubicacion']}")
-            
-            # Datos adicionales de la baja
-            motivo = st.text_input("Motivo de la baja")
-            autorizado = st.text_input("Autorizado por")
-            destino = st.text_input("Destino del equipo (ej. Almacén, Desecho)")
+                destino = st.text_input("Destino del equipo")
+                folio = st.text_input("Folio de acta")
+                fecha_acta = st.date_input("Fecha del acta")
+                valor_res = st.number_input("Valor residual", min_value=0.0, format="%.2f")
 
             if st.form_submit_button("🔴 Confirmar Baja Definitiva"):
-                conn = get_connection()
-                cur = conn.cursor()
-                # 1. Marcamos como Baja en inventario
-                cur.execute("UPDATE inventario SET estado='Baja' WHERE id=%s", (int(equipo_seleccionado['id']),))
-                # 2. Guardamos registro histórico en la tabla de bajas
-                sql_insert = """INSERT INTO bajas (equipo_info, fecha_baja, motivo, quien_autorizo, destino) 
-                                VALUES (%s, CURRENT_DATE, %s, %s, %s)"""
-                cur.execute(sql_insert, (f"{equipo_seleccionado['equipo']} {equipo_seleccionado['marca']} {equipo_seleccionado['modelo']}", 
-                                         motivo, autorizado, destino))
-                conn.commit()
-                conn.close()
-                st.success("¡Baja procesada con éxito!")
-                st.rerun()
+                try:
+                    conn = get_connection()
+                    cur = conn.cursor()
+                    
+                    # 1. Marcamos como Baja en la tabla inventario
+                    cur.execute("UPDATE inventario SET estado='Baja' WHERE id=%s", (int(equipo_sel['id']),))
+                    
+                    # 2. Insertamos el registro completo en la tabla bajas (9 campos)
+                    sql_insert = """INSERT INTO bajas 
+                    (equipo_info, fecha_baja, motivo, descripcion_motivo, quien_autorizo, destino, folio_acta, fecha_acta, valor_residual) 
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)"""
+                    
+                    cur.execute(sql_insert, (
+                        f"{equipo_sel['equipo']} {equipo_sel['marca']} {equipo_sel['modelo']}", 
+                        datetime.date.today(), 
+                        motivo, 
+                        obs, 
+                        autorizado, 
+                        destino, 
+                        folio, 
+                        fecha_acta, 
+                        valor_res
+                    ))
+                    
+                    conn.commit()
+                    cur.close()
+                    conn.close()
+                    st.success("¡Baja procesada y guardada correctamente!")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error al procesar la baja: {e}")
     else:
-        st.info("No hay equipos activos disponibles.")
+        st.info("No hay equipos activos disponibles para dar de baja.")
+
+    # 3. Mostrar historial de bajas para referencia
+    st.divider()
+    st.subheader("📋 Historial de Bajas")
+    conn = get_connection()
+    df_bajas = pd.read_sql("SELECT * FROM bajas ORDER BY fecha_baja DESC", conn)
+    conn.close()
+    st.dataframe(df_bajas, use_container_width=True)
+
