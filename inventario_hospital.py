@@ -17,6 +17,24 @@ from reportlab.lib.styles import getSampleStyleSheet
 # Configuración de la página
 st.set_page_config(layout="wide", page_title="Sistema Biomédico HDLM")
 
+# --- DISEÑO Y ESTILO DE PÁGINA ---
+st.markdown("""
+    <style>
+    .stApp {
+        background-color: #f4f7f6;
+    }
+    .stForm {
+        background-color: #ffffff;
+        border: 1px solid #dcdcdc;
+        border-radius: 8px;
+        padding: 20px;
+    }
+    [data-testid="stSidebar"] {
+        background-color: #e6eaf1;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
 # --- CONEXIÓN PWA (PARA INSTALAR LA APP) ---
 st.markdown("""
     <link rel="manifest" href="manifest.json">
