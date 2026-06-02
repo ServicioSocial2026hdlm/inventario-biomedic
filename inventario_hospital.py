@@ -4,72 +4,41 @@ Created on Tue May 12 16:43:59 2026
 
 @author: ISAHISURISADAYIBARRA
 """
+"""
+@author: ISAHISURISADAYIBARRA
+"""
 # -*- coding: utf-8 -*-
 import streamlit as st
 import pandas as pd
 import psycopg2
 import io
+import datetime
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import landscape, letter
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet
 
-# Configuración de la página
 st.set_page_config(layout="wide", page_title="Sistema Biomédico HDLM")
 
-# --- DISEÑO Y ESTILO DE PÁGINA ---
+# --- DISEÑO AZUL Y NEGRO ---
 st.markdown("""
     <style>
-    .stApp {
-        background-color: #f4f7f6;
+    .stApp { background-color: #003366; }
+    .stForm { 
+        background-color: #1a1a1a !important; 
+        border: 2px solid #000000; 
+        border-radius: 10px; 
+        padding: 20px; 
     }
-    .stForm {
-        background-color: #ffffff;
-        border: 1px solid #dcdcdc;
-        border-radius: 8px;
-        padding: 20px;
-    }
-    [data-testid="stSidebar"] {
-        background-color: #e6eaf1;
-    }
+    label, p, h1, h2, h3, div { color: #ffffff !important; }
+    [data-testid="stSidebar"] { background-color: #001a33; }
     </style>
 """, unsafe_allow_html=True)
 
-# --- SECCIÓN DE EXPORTACIÓN ---
-    st.divider()
-    st.subheader("Opciones de Reporte")
-    
-    # 1. Botón para Excel
-    excel_data = generate_excel(df) # Usa el dataframe que ya tienes arriba
-    st.download_button(
-        label="Descargar reporte en Excel",
-        data=excel_data,
-        file_name=f"reporte_{choice.lower()}_{datetime.date.today()}.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
-    
-    # 2. Botón para PDF
-    pdf_data = generate_pdf(df, f"Reporte de {choice}")
-    st.download_button(
-        label="Descargar reporte en PDF",
-        data=pdf_data,
-        file_name=f"reporte_{choice.lower()}_{datetime.date.today()}.pdf",
-        mime="application/pdf"
-    )
-# --- CONEXIÓN PWA (PARA INSTALAR LA APP) ---
-st.markdown("""
-    <link rel="manifest" href="manifest.json">
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black">
-    <meta name="theme-color" content="#0083B8">
-""", unsafe_allow_html=True)
-
-# --- FUNCIONES DE BASE DE DATOS ---
+# --- FUNCIONES ---
 def get_connection(): 
     return psycopg2.connect(**st.secrets["database"])
 
-# --- FUNCIONES DE REPORTES ---
 def generate_excel(df):
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
@@ -103,20 +72,24 @@ choice = st.sidebar.selectbox("Módulo", ["Inventario", "Mantenimiento", "Bajas"
 
 if choice == "Inventario":
     st.header("Inventario de Equipos")
-    with st.form("reg"):
+    with st.form("reg", clear_on_submit=True):
         c1, c2 = st.columns(2)
         with c1: eq = st.text_input("Nombre del Equipo"); ma = st.text_input("Marca"); mo = st.text_input("Modelo")
         with c2: se = st.text_input("Serie"); ub = st.text_input("Ubicación"); es = st.text_input("Estado")
         if st.form_submit_button("Guardar"):
             conn = get_connection(); cur = conn.cursor()
             cur.execute("INSERT INTO inventario (equipo, marca, modelo, serie, ubicacion, estado) VALUES (%s,%s,%s,%s,%s,%s)", (eq, ma, mo, se, ub, es))
-            conn.commit(); conn.close(); st.rerun()
-    conn = get_connection(); df = pd.read_sql("SELECT * FROM inventario", conn); conn.close()
+            conn.commit(); conn.close(); st.success("Guardado")
+    
+    conn = get_connection(); df = pd.read_sql("SELECT * FROM inventario WHERE estado != 'Baja'", conn); conn.close()
     st.dataframe(df, use_container_width=True)
+    
+    st.divider()
+    st.download_button("Descargar Excel", data=generate_excel(df), file_name="inventario.xlsx")
 
 elif choice == "Mantenimiento":
     st.header("Registro de Mantenimiento")
-    with st.form("form_manto"):
+    with st.form("form_manto", clear_on_submit=True):
         c1, c2 = st.columns(2)
         with c1: equipo = st.text_input("Nombre del Equipo"); serie = st.text_input("Serie del Equipo"); fecha = st.text_input("Fecha")
         with c2: tipo = st.text_input("Tipo de Mantenimiento"); tec = st.text_input("Técnico"); costo = st.text_input("Costo")
@@ -127,8 +100,10 @@ elif choice == "Mantenimiento":
             conn.commit(); conn.close(); st.success("Guardado")
     conn = get_connection(); df = pd.read_sql("SELECT * FROM mantenimientos", conn); conn.close()
     st.dataframe(df, use_container_width=True)
+    
+    st.divider()
+    st.download_button("Descargar Excel", data=generate_excel(df), file_name="mantenimientos.xlsx")
 
-# --- MÓDULO DE BAJAS CORREGIDO ---
 elif choice == "Bajas":
     st.header("Control de Bajas")
     conn = get_connection()
@@ -136,35 +111,27 @@ elif choice == "Bajas":
     conn.close()
 
     if not df.empty:
-        with st.form("form_baja_completo"):
+        with st.form("form_baja_completo", clear_on_submit=True):
             st.subheader("Datos del equipo a dar de baja")
             seleccion = st.selectbox("Seleccione el equipo", df["equipo"] + " - " + df["serie"])
             equipo_sel = df[df["equipo"] + " - " + df["serie"] == seleccion].iloc[0]
             
             c1, c2 = st.columns(2)
-            with c1:
-                motivo = st.text_input("Motivo de la baja")
-                obs = st.text_area("Descripción detallada del motivo")
-                autorizado = st.text_input("Autorizado por")
-            with c2:
-                destino = st.text_input("Destino del equipo")
-                folio = st.text_input("Folio de acta")
-                fecha_acta = st.date_input("Fecha del acta")
-                valor_res = st.number_input("Valor residual", min_value=0.0, format="%.2f")
+            with c1: motivo = st.text_input("Motivo de la baja"); obs = st.text_area("Descripción detallada"); autorizado = st.text_input("Autorizado por")
+            with c2: destino = st.text_input("Destino"); folio = st.text_input("Folio de acta"); fecha_acta = st.date_input("Fecha del acta"); valor_res = st.number_input("Valor residual", min_value=0.0)
 
             if st.form_submit_button("Confirmar Baja Definitiva"):
-                try:
-                    conn = get_connection()
-                    cur = conn.cursor()
-                    cur.execute("UPDATE inventario SET estado='Baja' WHERE id=%s", (int(equipo_sel['id']),))
-                    sql_insert = """INSERT INTO bajas 
-                                    (id_equipo, fecha_baja, motivo, descripcion_motivo, quien_autorizo, destino, folio_acta, fecha_acta, valor_residual) 
-                                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)"""
-                    cur.execute(sql_insert, (int(equipo_sel['id']), datetime.date.today(), motivo, obs, autorizado, destino, folio, fecha_acta, valor_res))
-                    conn.commit(); cur.close(); conn.close()
-                    st.success("Baja procesada correctamente")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Error de base de datos: {e}")
-    else:
-        st.info("No hay equipos disponibles para dar de baja.")
+                conn = get_connection(); cur = conn.cursor()
+                cur.execute("UPDATE inventario SET estado='Baja' WHERE id=%s", (int(equipo_sel['id']),))
+                cur.execute("INSERT INTO bajas (id_equipo, fecha_baja, motivo, descripcion_motivo, quien_autorizo, destino, folio_acta, fecha_acta, valor_residual) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)", (int(equipo_sel['id']), datetime.date.today(), motivo, obs, autorizado, destino, folio, fecha_acta, valor_res))
+                conn.commit(); conn.close(); st.success("Baja procesada")
+                st.rerun()
+
+    st.subheader("Historial de Bajas")
+    conn = get_connection()
+    df_h = pd.read_sql("SELECT b.*, i.equipo FROM bajas b JOIN inventario i ON b.id_equipo = i.id", conn)
+    conn.close()
+    st.dataframe(df_h, use_container_width=True)
+    
+    st.divider()
+    st.download_button("Descargar Reporte Bajas (PDF)", data=generate_pdf(df_h, "Reporte de Bajas"), file_name="bajas.pdf")No hay equipos disponibles para dar de baja.")
