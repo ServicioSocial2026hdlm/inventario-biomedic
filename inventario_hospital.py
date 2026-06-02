@@ -35,6 +35,27 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+# --- SECCIÓN DE EXPORTACIÓN ---
+    st.divider()
+    st.subheader("Opciones de Reporte")
+    
+    # 1. Botón para Excel
+    excel_data = generate_excel(df) # Usa el dataframe que ya tienes arriba
+    st.download_button(
+        label="Descargar reporte en Excel",
+        data=excel_data,
+        file_name=f"reporte_{choice.lower()}_{datetime.date.today()}.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    
+    # 2. Botón para PDF
+    pdf_data = generate_pdf(df, f"Reporte de {choice}")
+    st.download_button(
+        label="Descargar reporte en PDF",
+        data=pdf_data,
+        file_name=f"reporte_{choice.lower()}_{datetime.date.today()}.pdf",
+        mime="application/pdf"
+    )
 # --- CONEXIÓN PWA (PARA INSTALAR LA APP) ---
 st.markdown("""
     <link rel="manifest" href="manifest.json">
