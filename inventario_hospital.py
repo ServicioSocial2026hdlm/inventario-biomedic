@@ -77,7 +77,7 @@ def get_connection():
 
 if choice == "Inventario":
     st.header("Inventario de Equipos")
-    with st.form("reg"):
+    with st.form("reg", clear_on_submit=True):
         c1, c2 = st.columns(2)
         with c1: eq = st.text_input("Nombre del Equipo"); ma = st.text_input("Marca"); mo = st.text_input("Modelo")
         with c2: se = st.text_input("Serie"); ub = st.text_input("Ubicación"); es = st.text_input("Estado")
