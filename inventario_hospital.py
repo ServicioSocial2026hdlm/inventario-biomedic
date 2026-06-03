@@ -12,46 +12,41 @@ from reportlab.lib.styles import getSampleStyleSheet
 # Configuración de la página
 st.set_page_config(layout="wide", page_title="Sistema Biomédico HDLM")
 
-# --- DISEÑO Y ESTILO DE PÁGINA ---
 # --- DISEÑO Y ESTILO DE PÁGINA (MODO OSCURO Y AZUL) ---
 st.markdown("""
     <style>
-    /* Fondo de toda la aplicación */
-    .stApp { 
-        background-color: #000000 !important; 
-        color: #87CEEB !important;
+    /* Fondo general */
+    .stApp { background-color: #000000 !important; color: #87CEEB !important; }
+
+    /* Estilo para las casillas de entrada (input, selectbox, textarea) */
+    div[data-baseweb="base-input"], 
+    div[data-baseweb="select"], 
+    textarea {
+        background-color: #89CFF0 !important; /* Azul Bebé */
+        color: #000000 !important;           /* Texto negro para leer mejor */
+        border-radius: 8px !important;
     }
-    
-    /* Contenedor principal y formularios */
+
+    /* Ajustar el texto dentro de las casillas */
+    input, div[data-baseweb="select"] > div {
+        color: #000000 !important;
+        background-color: #89CFF0 !important;
+    }
+
+    /* Ajustar el color de fondo del formulario */
     .stForm { 
         background-color: #121212 !important; 
         border: 1px solid #87CEEB !important; 
-        border-radius: 12px; 
-        padding: 25px; 
     }
     
-    /* Textos, etiquetas e inputs */
-    h1, h2, h3, label, p { 
-        color: #87CEEB !important; 
-    }
+    /* Textos principales */
+    h1, h2, h3, label { color: #87CEEB !important; }
     
     /* Sidebar */
-    [data-testid="stSidebar"] { 
-        background-color: #0d1117 !important; 
-    }
-    
-    /* Asegurar que las celdas de las tablas también tengan contraste */
-    .stDataFrame {
-        color: #87CEEB !important;
-    }
-    
-    /* Ajuste para los inputs */
-    input {
-        color: #87CEEB !important;
-        background-color: #1a1a1a !important;
-    }
+    [data-testid="stSidebar"] { background-color: #0d1117 !important; }
     </style>
 """, unsafe_allow_html=True)
+
 # --- FUNCIONES DE REPORTES ---
 def generate_excel(df):
     output = io.BytesIO()
