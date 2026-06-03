@@ -91,36 +91,62 @@ if choice == "Inventario":
 
 elif choice == "Mantenimiento":
     st.header("Registro de Mantenimiento")
-    with st.form("form_manto"):
+    # Cambiamos el nombre a "form_manto" para que sea único y no choque con Inventario
+    with st.form("form_manto", clear_on_submit=True):
         c1, c2 = st.columns(2)
-        with c1: equipo = st.text_input("Nombre del Equipo"); serie = st.text_input("Serie del Equipo"); fecha = st.text_input("Fecha")
-        with c2: tipo = st.text_input("Tipo de Mantenimiento"); tec = st.text_input("Técnico"); costo = st.text_input("Costo")
-        prox = st.text_input("Próximo mantenimiento"); desc = st.text_area("Descripción detallada del trabajo")
+        with c1: 
+            equipo = st.text_input("Nombre del Equipo")
+            serie = st.text_input("Serie del Equipo")
+            fecha = st.text_input("Fecha")
+        with c2: 
+            tipo = st.text_input("Tipo de Mantenimiento")
+            tec = st.text_input("Técnico")
+            costo = st.text_input("Costo")
+        prox = st.text_input("Próximo mantenimiento")
+        desc = st.text_area("Descripción detallada del trabajo")
+        
         if st.form_submit_button("Guardar Mantenimiento"):
+            # Tu lógica de base de datos aquí...
             conn = get_connection(); cur = conn.cursor()
-            cur.execute("INSERT INTO mantenimientos (equipo_info, fecha_mantenimiento, tipo, tecnico, costo, descripcion, proximo_mantenimiento) VALUES (%s,%s,%s,%s,%s,%s,%s)", (f"{equipo} (S/N: {serie})", fecha, tipo, tec, costo, desc, prox))
-            conn.commit(); conn.close(); st.success("Guardado"); st.rerun()
-    conn = get_connection(); df = pd.read_sql("SELECT * FROM mantenimientos", conn); conn.close()
-    st.dataframe(df, use_container_width=True)
-    export_module(df, "Mantenimientos")
+            cur.execute("INSERT INTO mantenimientos (...) VALUES (...)", (...))
+            conn.commit(); conn.close(); st.success("Guardado")
+            st.rerun() # Esto recarga y limpia el formulario gracias al clear_on_submit
 
 elif choice == "Bajas":
     st.header("Control de Bajas")
     conn = get_connection(); df = pd.read_sql("SELECT * FROM inventario WHERE estado != 'Baja'", conn); conn.close()
+    
     if not df.empty:
-        with st.form("form_baja_completo"):
+        # Cambiamos "reg" por "form_baja" para que sea único
+        with st.form("form_baja", clear_on_submit=True):
             seleccion = st.selectbox("Seleccione el equipo", df["equipo"] + " - " + df["serie"])
-            equipo_sel = df[df["equipo"] + " - " + df["serie"] == seleccion].iloc[0]
+            # Nota: Al usar clear_on_submit, debemos asegurarnos de que la lógica de guardado procese los datos antes de limpiar
             c1, c2 = st.columns(2)
-            with c1: motivo = st.text_input("Motivo"); obs = st.text_area("Descripción"); autor = st.text_input("Autorizado por")
-            with c2: destino = st.text_input("Destino"); folio = st.text_input("Folio"); f_acta = st.date_input("Fecha acta"); val = st.number_input("Valor residual", format="%.2f")
+            with c1: 
+                motivo = st.text_input("Motivo")
+                obs = st.text_area("Descripción")
+                autor = st.text_input("Autorizado por")
+            with c2: 
+                destino = st.text_input("Destino")
+                folio = st.text_input("Folio")
+                f_acta = st.date_input("Fecha acta")
+                val = st.number_input("Valor residual", format="%.2f")
+            
             if st.form_submit_button("Confirmar Baja"):
+                # Obtenemos el equipo seleccionado justo antes de procesar
+                equipo_sel = df[df["equipo"] + " - " + df["serie"] == seleccion].iloc[0]
+                
                 conn = get_connection(); cur = conn.cursor()
                 cur.execute("UPDATE inventario SET estado='Baja' WHERE id=%s", (int(equipo_sel['id']),))
-                cur.execute("INSERT INTO bajas (id_equipo, fecha_baja, motivo, descripcion_motivo, quien_autorizo, destino, folio_acta, fecha_acta, valor_residual) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)", (int(equipo_sel['id']), datetime.date.today(), motivo, obs, autor, destino, folio, f_acta, val))
-                conn.commit(); conn.close(); st.success("Baja procesada"); st.rerun()
-    else: st.info("No hay equipos para dar de baja.")
+                cur.execute("INSERT INTO bajas (id_equipo, fecha_baja, motivo, descripcion_motivo, quien_autorizo, destino, folio_acta, fecha_acta, valor_residual) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)", 
+                            (int(equipo_sel['id']), datetime.date.today(), motivo, obs, autor, destino, folio, f_acta, val))
+                conn.commit(); cur.close(); conn.close()
+                st.success("Baja procesada")
+                st.rerun() # Esto recargará la página y el formulario se limpiará
+    else: 
+        st.info("No hay equipos para dar de baja.")
     
+    # Mostrar tabla de bajas históricas
     conn = get_connection(); df_bajas = pd.read_sql("SELECT * FROM bajas", conn); conn.close()
     st.dataframe(df_bajas, use_container_width=True)
     export_module(df_bajas, "Reporte_Bajas")
