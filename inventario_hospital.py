@@ -135,7 +135,6 @@ if choice == "Inventario":
 
 elif choice == "Mantenimiento":
     st.header("Registro de Mantenimiento")
-    # Cambiamos el nombre a "form_manto" para que sea único y no choque con Inventario
     with st.form("form_manto", clear_on_submit=True):
         c1, c2 = st.columns(2)
         with c1: 
@@ -150,11 +149,33 @@ elif choice == "Mantenimiento":
         desc = st.text_area("Descripción detallada del trabajo")
         
         if st.form_submit_button("Guardar Mantenimiento"):
-            # Tu lógica de base de datos aquí...
-            conn = get_connection(); cur = conn.cursor()
-            cur.execute("INSERT INTO mantenimientos (...) VALUES (...)", (...))
-            conn.commit(); conn.close(); st.success("Guardado")
-            st.rerun() # Esto recarga y limpia el formulario gracias al clear_on_submit
+            conn = get_connection()
+            cur = conn.cursor()
+            
+            try:
+                query = """
+                    INSERT INTO mantenimientos 
+                    (equipo_info, fecha_mantenimiento, tipo, tecnico, costo, descripcion, proximo_mantenimiento) 
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """
+                
+                info_equipo = f"{equipo} - Serie: {serie}"
+                valor_costo = float(costo) if costo and costo.replace('.','',1).isdigit() else 0.0
+                
+                valores = (info_equipo, fecha, tipo, tec, valor_costo, desc, prox)
+                
+                cur.execute(query, valores)
+                conn.commit()
+                
+                st.success("¡Mantenimiento guardado exitosamente!")
+                
+            except Exception as e:
+                st.error(f"Error al guardar en la base de datos: {e}")
+            
+            finally:
+                cur.close()
+                conn.close()
+                st.rerun()
 
 elif choice == "Bajas":
     st.header("Control de Bajas")
