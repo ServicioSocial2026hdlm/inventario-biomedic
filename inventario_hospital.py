@@ -3,56 +3,25 @@ import streamlit as st
 import pandas as pd
 import psycopg2
 import io
-import datetime
-from reportlab.lib import colors
+import xlsxwriter
+from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import landscape, letter
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-from reportlab.lib.styles import getSampleStyleSheet
 
 # Configuración de la página
 st.set_page_config(layout="wide", page_title="Sistema Biomédico HDLM")
 
-# --- DISEÑO Y ESTILO DE PÁGINA (MODO OSCURO Y AZUL) ---
+# --- DISEÑO Y ESTILO DE PÁGINA ---
 st.markdown("""
     <style>
-    /* 1. Fondo General */
-    .stApp { background-color: #000000 !important; color: #87CEEB !important; }
-
-    /* 2. Formularios y Contenedores */
-    .stForm { background-color: #121212 !important; border: 1px solid #87CEEB !important; }
-
-    /* 3. Casillas de Llenado (Inputs, Selectboxes, Textareas) */
-    div[data-baseweb="base-input"], div[data-baseweb="select"], textarea {
-        background-color: #89CFF0 !important; 
-        color: #000000 !important;
-        border-radius: 8px !important;
-    }
-    input { color: #000000 !important; font-weight: bold; }
-
-    /* 4. Tablas (DataFrame) */
-    .stDataFrame {
-        background-color: #121212 !important;
-        border: 1px solid #87CEEB !important;
-    }
-    /* Encabezados de tabla */
-    thead tr th { background-color: #87CEEB !important; color: #000000 !important; }
-    /* Filas de tabla */
-    tbody tr td { color: #87CEEB !important; }
-
-    /* 5. Botones */
-    div.stButton > button {
-        background-color: #89CFF0 !important;
-        color: #000000 !important;
-        border: none !important;
-        border-radius: 5px !important;
-        font-weight: bold !important;
-    }
-    div.stButton > button:hover { background-color: #5DADE2 !important; }
-
-    /* 6. Textos */
-    h1, h2, h3, label { color: #87CEEB !important; }
+    .stApp { background-color: #f4f7f6; }
+    .stForm { background-color: #ffffff; border: 1px solid #dcdcdc; border-radius: 8px; padding: 20px; }
+    [data-testid="stSidebar"] { background-color: #e6eaf1; }
     </style>
 """, unsafe_allow_html=True)
+
+# --- FUNCIONES DE BASE DE DATOS ---
+def get_connection(): 
+    return psycopg2.connect(**st.secrets["database"])
 
 # --- FUNCIONES DE REPORTES ---
 def generate_excel(df):
@@ -61,29 +30,69 @@ def generate_excel(df):
         df.to_excel(writer, index=False)
     return output.getvalue()
 
-def generate_pdf(df, titulo):
+def generate_pdf_custom(df, titulo):
     buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=landscape(letter))
-    styles = getSampleStyleSheet()
-    elements = [Paragraph(titulo, styles['Title']), Spacer(1, 12)]
-    data = [df.columns.tolist()] + df.values.tolist()
-    t = Table(data)
-    t.setStyle(TableStyle([('GRID', (0,0), (-1,-1), 0.5, colors.black), ('BACKGROUND', (0,0), (-1,0), colors.grey)]))
-    elements.append(t); doc.build(elements)
+    # 792 puntos de ancho x 612 puntos de alto (Carta Horizontal)
+    c = canvas.Canvas(buffer, pagesize=(792, 612))
+    
+    # 1. INSERTAR IMAGEN (Logo ISSEA)
+    # Debe estar en la misma carpeta que este archivo .py
+    try:
+        c.drawImage("issea.png", 50, 520, width=100, height=50)
+    except:
+        pass 
+
+    # 2. ENCABEZADO
+    c.setFont("Helvetica-Bold", 20)
+    c.drawCentredString(450, 550, "INVENTARIO DE EQUIPO MEDICO")
+    
+    # 3. ENCABEZADOS DE TABLA
+    y = 480
+    columnas = ["ID", "NOMBRE", "MARCA", "MODELO", "SERIE", "UBICACIÓN", "ESTADO", "FECHA"]
+    pos_x = [50, 120, 250, 350, 450, 550, 650, 720]
+    
+    c.setFont("Helvetica-Bold", 10)
+    for i, col in enumerate(columnas):
+        c.drawString(pos_x[i], y, col)
+    
+    c.line(50, 475, 780, 475)
+    
+    # 4. CONTENIDO
+    y -= 25
+    c.setFont("Helvetica", 9)
+    for _, row in df.iterrows():
+        datos = [
+            str(row.get('id', '')),
+            str(row.get('equipo', '')),
+            str(row.get('marca', '')),
+            str(row.get('modelo', '')),
+            str(row.get('serie', '')),
+            str(row.get('ubicacion', '')),
+            str(row.get('estado', '')),
+            str(row.get('fecha', ''))
+        ]
+        
+        for i, val in enumerate(datos):
+            c.drawString(pos_x[i], y, val)
+        y -= 20
+        
+        if y < 50:
+            c.showPage()
+            y = 550
+            
+    c.save()
     return buffer.getvalue()
 
 def export_module(df, nombre):
     st.write("---")
     st.subheader("📤 Exportar Datos")
-    # El usuario selecciona qué filas incluir
-    indices = st.multiselect("Selecciona registros para exportar (vacío = todos):", df.index.tolist())
+    indices = st.multiselect("Selecciona registros para exportar:", df.index.tolist())
     df_f = df.loc[indices] if indices else df
     
     if not df_f.empty:
         c1, c2 = st.columns(2)
         c1.download_button("📥 Exportar a Excel", generate_excel(df_f), f"{nombre}.xlsx", "application/vnd.ms-excel")
-        c2.download_button("📄 Exportar a PDF", generate_pdf(df_f, nombre), f"{nombre}.pdf", "application/pdf")
-
+        c2.download_button("📄 Exportar a PDF", generate_pdf_custom(df_f, nombre), f"{nombre}.pdf", "application/pdf")
 # --- SEGURIDAD ---
 if "authenticated" not in st.session_state: st.session_state.authenticated = False
 if not st.session_state.authenticated:
