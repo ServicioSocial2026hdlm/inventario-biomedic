@@ -32,53 +32,54 @@ def generate_excel(df):
 
 def generate_pdf_custom(df, titulo):
     buffer = io.BytesIO()
-    # 792 puntos de ancho x 612 puntos de alto (Carta Horizontal)
-    c = canvas.Canvas(buffer, pagesize=(792, 612))
+    # Tamaño carta en horizontal
+    c = canvas.Canvas(buffer, pagesize=landscape(letter))
     
-    # 1. INSERTAR IMAGEN (Logo ISSEA)
-    # Debe estar en la misma carpeta que este archivo .py
+    # --- 1. LOGO Y ENCABEZADO ---
     try:
-        c.drawImage("issea.png", 50, 520, width=100, height=50)
+        # Asegúrate de que el archivo 'issea.png' esté en la misma carpeta que el .py
+        c.drawImage("issea.png", 50, 520, width=120, height=60)
     except:
-        pass 
-
-    # 2. ENCABEZADO
-    c.setFont("Helvetica-Bold", 20)
-    c.drawCentredString(450, 550, "INVENTARIO DE EQUIPO MEDICO")
+        pass
     
-    # 3. ENCABEZADOS DE TABLA
-    y = 480
-    columnas = ["ID", "NOMBRE", "MARCA", "MODELO", "SERIE", "UBICACIÓN", "ESTADO", "FECHA"]
-    pos_x = [50, 120, 250, 350, 450, 550, 650, 720]
+    c.setFont("Helvetica-Bold", 14)
+    c.drawCentredString(450, 560, "HOSPITAL DE LA MUJER")
+    c.drawCentredString(450, 540, "INGENIERÍA BIOMÉDICA")
+    c.setFont("Helvetica-Bold", 16)
+    c.drawCentredString(450, 500, "INVENTARIO DE EQUIPO MEDICO")
     
+    # --- 2. DIBUJO DE LA TABLA ---
+    y = 450
+    # Posiciones X ajustadas para que se vean centradas y alineadas
+    pos_x = [60, 110, 260, 370, 480, 590, 690] 
+    headers = ["ID", "NOMBRE", "MARCA", "MODELO", "SERIE", "UBICACIÓN", "ESTADO"]
+    
+    # Rectángulo del encabezado de tabla
+    c.rect(50, y, 700, 30) 
     c.setFont("Helvetica-Bold", 10)
-    for i, col in enumerate(columnas):
-        c.drawString(pos_x[i], y, col)
-    
-    c.line(50, 475, 780, 475)
-    
-    # 4. CONTENIDO
+    for i, h in enumerate(headers):
+        c.drawString(pos_x[i], y + 10, h)
+        
+    # --- 3. CONTENIDO ---
     y -= 25
     c.setFont("Helvetica", 9)
     for _, row in df.iterrows():
-        datos = [
-            str(row.get('id', '')),
-            str(row.get('equipo', '')),
-            str(row.get('marca', '')),
-            str(row.get('modelo', '')),
-            str(row.get('serie', '')),
-            str(row.get('ubicacion', '')),
-            str(row.get('estado', '')),
-            str(row.get('fecha', ''))
-        ]
+        # Línea horizontal para cada fila
+        c.line(50, y + 20, 750, y + 20)
+        
+        datos = [str(row.get('id', '')), str(row.get('equipo', '')), 
+                 str(row.get('marca', '')), str(row.get('modelo', '')), 
+                 str(row.get('serie', '')), str(row.get('ubicacion', '')), 
+                 str(row.get('estado', ''))]
         
         for i, val in enumerate(datos):
-            c.drawString(pos_x[i], y, val)
-        y -= 20
+            c.drawString(pos_x[i], y + 5, val)
+        y -= 25
         
+        # Nueva página si se llena
         if y < 50:
             c.showPage()
-            y = 550
+            y = 500
             
     c.save()
     return buffer.getvalue()
