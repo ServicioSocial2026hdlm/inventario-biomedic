@@ -35,18 +35,14 @@ def generate_pdf_custom(df, titulo):
     # Tamaño carta en horizontal
     c = canvas.Canvas(buffer, pagesize=landscape(letter))
     
-    # --- 1. LOGO Y ENCABEZADO ---
-    try:
-        # Asegúrate de que el archivo 'issea.png' esté en la misma carpeta que el .py
-        c.drawImage("issea.png", 50, 520, width=120, height=60)
-    except:
-        pass
-    
-    c.setFont("Helvetica-Bold", 14)
-    c.drawCentredString(450, 560, "HOSPITAL DE LA MUJER")
-    c.drawCentredString(450, 540, "INGENIERÍA BIOMÉDICA")
-    c.setFont("Helvetica-Bold", 16)
-    c.drawCentredString(450, 500, "INVENTARIO DE EQUIPO MEDICO")
+# --- 1. LOGO Y ENCABEZADO (Prueba de diagnóstico) ---
+c.drawImage("issea.png", 50, 520, width=120, height=60)
+
+c.setFont("Helvetica-Bold", 14)
+c.drawCentredString(450, 560, "HOSPITAL DE LA MUJER")
+c.drawCentredString(450, 540, "INGENIERÍA BIOMÉDICA")
+c.setFont("Helvetica-Bold", 16)
+c.drawCentredString(450, 500, "INVENTARIO DE EQUIPO MEDICO")
     
     # --- 2. DIBUJO DE LA TABLA ---
     y = 450
