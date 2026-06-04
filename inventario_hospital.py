@@ -140,12 +140,13 @@ elif choice == "Mantenimiento":
         with c1: 
             equipo = st.text_input("Nombre del Equipo")
             serie = st.text_input("Serie del Equipo")
-            fecha = st.text_input("Fecha")
+            # Usamos date_input para asegurar el formato de fecha correcto
+            fecha = st.date_input("Fecha de Mantenimiento")
         with c2: 
             tipo = st.text_input("Tipo de Mantenimiento")
             tec = st.text_input("Técnico")
             costo = st.text_input("Costo")
-        prox = st.text_input("Próximo mantenimiento")
+        prox = st.date_input("Próximo mantenimiento")
         desc = st.text_area("Descripción detallada del trabajo")
         
         if st.form_submit_button("Guardar Mantenimiento"):
@@ -167,6 +168,8 @@ elif choice == "Mantenimiento":
                 cur.execute(query, valores)
                 conn.commit()
                 
+                # Esto te dirá si realmente se insertó algo
+                st.write(f"Estado: {cur.rowcount} registro(s) guardado(s).")
                 st.success("¡Mantenimiento guardado exitosamente!")
                 
             except Exception as e:
