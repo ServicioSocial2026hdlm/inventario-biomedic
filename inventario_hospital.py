@@ -43,13 +43,16 @@ def generate_pdf_custom(df, titulo):
     c.setFont("Helvetica-Bold", 14)
     c.drawCentredString(450, 560, "HOSPITAL DE LA MUJER")
     c.drawCentredString(450, 540, "INGENIERÍA BIOMÉDICA")
+    
+    # Título principal más arriba
     c.setFont("Helvetica-Bold", 16)
     c.drawCentredString(450, 500, "INVENTARIO DE EQUIPO MEDICO")
+    
     c.setFont("Helvetica", 10)
-    c.drawCentredString(450, 525, "(F-HM-BM-01)")
+    c.drawCentredString(450, 480, "(F-HM-BM-01)")
     
     # --- 2. DIBUJO DE LA TABLA ---
-    y = 450
+    y = 440
     pos_x = [60, 110, 260, 370, 480, 580, 700] 
     headers = ["ID", "NOMBRE", "MARCA", "MODELO", "SERIE", "UBICACIÓN", "ESTADO"]
     c.rect(50, y, 700, 30) 
