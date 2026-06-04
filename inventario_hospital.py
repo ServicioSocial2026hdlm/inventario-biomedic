@@ -26,49 +26,57 @@ def get_connection():
 # --- FUNCIONES DE REPORTES ---
 def generate_excel(df):
     output = io.BytesIO()
+    
+    # 1. Filtramos para que solo salgan las columnas del PDF
+    columnas_deseadas = ['id', 'equipo', 'marca', 'modelo', 'serie', 'ubicacion', 'estado']
+    # .copy() evita advertencias de pandas
+    df_filtrado = df[columnas_deseadas].copy()
+    # Renombramos para que se vean en mayúsculas como en el PDF
+    df_filtrado.columns = ["ID", "NOMBRE", "MARCA", "MODELO", "SERIE", "UBICACIÓN", "ESTADO"]
+    
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-        # Los datos inician en la fila 7 (índice 6)
-        df.to_excel(writer, index=False, sheet_name='Inventario', startrow=6)
+        # 2. Escribimos los datos en la fila 7 (índice 6)
+        df_filtrado.to_excel(writer, index=False, sheet_name='Inventario', startrow=6)
         
         workbook = writer.book
         worksheet = writer.sheets['Inventario']
         
-        # --- FORMATOS ---
+        # 3. Definir Formatos
         header_format = workbook.add_format({
             'bold': True, 'align': 'center', 'valign': 'center',
             'fg_color': '#D3D3D3', 'border': 1
         })
         title_format = workbook.add_format({'bold': True, 'font_size': 14, 'align': 'center'})
         subtitle_format = workbook.add_format({'bold': True, 'font_size': 12, 'align': 'center'})
-        cell_format = workbook.add_format({'border': 1, 'align': 'left'})
         
-        # --- 1. TÍTULOS Y ENCABEZADOS (Igual al PDF) ---
+        # 4. Títulos (igual al diseño del PDF)
         worksheet.merge_range('A2:G2', 'HOSPITAL DE LA MUJER', title_format)
         worksheet.merge_range('A3:G3', 'INGENIERÍA BIOMÉDICA', subtitle_format)
         worksheet.merge_range('A4:G4', 'INVENTARIO DE EQUIPO MÉDICO', title_format)
         worksheet.merge_range('A5:G5', '(F-HM-BM-01)', subtitle_format)
         
-        # --- 2. DIBUJAR TABLA ---
-        # Aplicamos el encabezado a la fila 7
-        headers = ["ID", "NOMBRE", "MARCA", "MODELO", "SERIE", "UBICACIÓN", "ESTADO"]
-        for i, h in enumerate(headers):
-            worksheet.write(6, i, h, header_format)
-            worksheet.set_column(i, i, 18) # Ancho de columna
-            
-        # --- 3. PIE DE PÁGINA ---
-        # Calculamos la fila final para poner el REV-01
-        last_row = len(df) + 7
-        worksheet.write(last_row, 6, "REV-01", workbook.add_format({'align': 'right'}))
-        
-        # --- 4. LOGO ---
+        # 5. Insertar Logo
         try:
             worksheet.insert_image('A1', 'issea.png', {'x_scale': 0.5, 'y_scale': 0.5})
         except:
             pass
+            
+        # 6. Formato a las columnas de la tabla
+        for i, col in enumerate(df_filtrado.columns):
+            worksheet.set_column(i, i, 20) # Ancho fijo para que no se vea amontonado
+            worksheet.write(6, i, col, header_format) # Reescribir encabezado con estilo
+            
+        # 7. Pie de página
+        last_row = len(df_filtrado) + 7
+        worksheet.write(last_row, 6, "REV-01", workbook.add_format({'align': 'right'}))
+        
+        # Configuración de impresión
+        worksheet.set_landscape()
+        worksheet.set_paper(9) # A4
+        worksheet.fit_to_pages(1, 0) # Ajustar ancho
+        worksheet.hide_gridlines(2) # Estilo limpio
 
     return output.getvalue()
-
-
 def generate_pdf_custom(df, titulo):
     buffer = io.BytesIO()
     c = canvas.Canvas(buffer, pagesize=landscape(letter))
