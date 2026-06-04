@@ -32,51 +32,52 @@ def generate_excel(df):
 
 def generate_pdf_custom(df, titulo):
     buffer = io.BytesIO()
-    # Tamaño carta en horizontal
     c = canvas.Canvas(buffer, pagesize=landscape(letter))
     
-# --- 1. LOGO Y ENCABEZADO ---
-    c.drawImage("issea.png", 50, 520, width=120, height=60)
+    # --- 1. LOGO Y ENCABEZADO ---
+    try:
+        c.drawImage("issea.png", 50, 520, width=120, height=60)
+    except:
+        pass
     
     c.setFont("Helvetica-Bold", 14)
     c.drawCentredString(450, 560, "HOSPITAL DE LA MUJER")
     c.drawCentredString(450, 540, "INGENIERÍA BIOMÉDICA")
+    c.setFont("Helvetica", 10)
+    c.drawCentredString(450, 525, "(F-HM-BM-01)")
     c.setFont("Helvetica-Bold", 16)
     c.drawCentredString(450, 500, "INVENTARIO DE EQUIPO MEDICO")
     
-# --- 2. DIBUJO DE LA TABLA Y ENCABEZADOS ---
+    # --- 2. DIBUJO DE LA TABLA ---
     y = 450
     pos_x = [60, 110, 260, 370, 480, 580, 700] 
     headers = ["ID", "NOMBRE", "MARCA", "MODELO", "SERIE", "UBICACIÓN", "ESTADO"]
-    
     c.rect(50, y, 700, 30) 
     c.setFont("Helvetica-Bold", 10)
     for i, h in enumerate(headers):
         c.drawString(pos_x[i], y + 10, h)
         
-    # --- 3. CONTENIDO ---
+    # --- 3. CONTENIDO Y PIE DE PÁGINA ---
     y -= 25
     c.setFont("Helvetica", 9)
+    
+    def draw_footer(canvas_obj):
+        canvas_obj.setFont("Helvetica", 8)
+        canvas_obj.drawRightString(750, 20, "REV-01")
+        
+    draw_footer(c)
+    
     for _, row in df.iterrows():
         c.line(50, y + 20, 750, y + 20)
-        
-        datos = [
-            str(row.get('id', '')),
-            str(row.get('equipo', '')),
-            str(row.get('marca', '')),
-            str(row.get('modelo', '')),
-            str(row.get('serie', '')),
-            str(row.get('ubicacion', '')),
-            str(row.get('estado', ''))
-        ]
-        
+        datos = [str(row.get('id', '')), str(row.get('equipo', '')), str(row.get('marca', '')), 
+                 str(row.get('modelo', '')), str(row.get('serie', '')), str(row.get('ubicacion', '')), 
+                 str(row.get('estado', ''))]
         for i, val in enumerate(datos):
             c.drawString(pos_x[i], y + 5, val)
         y -= 25
-        
-        # Nueva página si se llena
         if y < 50:
             c.showPage()
+            draw_footer(c)
             y = 450
             c.rect(50, y, 700, 30)
             c.setFont("Helvetica-Bold", 10)
@@ -87,6 +88,7 @@ def generate_pdf_custom(df, titulo):
             
     c.save()
     return buffer.getvalue()
+# --- IMPRESO ---    
 def export_module(df, nombre):
     st.write("---")
     st.subheader("📤 Exportar Datos")
