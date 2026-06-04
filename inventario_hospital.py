@@ -43,10 +43,10 @@ def generate_pdf_custom(df, titulo):
     c.setFont("Helvetica-Bold", 14)
     c.drawCentredString(450, 560, "HOSPITAL DE LA MUJER")
     c.drawCentredString(450, 540, "INGENIERÍA BIOMÉDICA")
-    c.setFont("Helvetica", 10)
-    c.drawCentredString(450, 525, "(F-HM-BM-01)")
     c.setFont("Helvetica-Bold", 16)
     c.drawCentredString(450, 500, "INVENTARIO DE EQUIPO MEDICO")
+    c.setFont("Helvetica", 10)
+    c.drawCentredString(450, 525, "(F-HM-BM-01)")
     
     # --- 2. DIBUJO DE LA TABLA ---
     y = 450
