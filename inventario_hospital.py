@@ -44,26 +44,31 @@ def generate_pdf_custom(df, titulo):
     c.setFont("Helvetica-Bold", 16)
     c.drawCentredString(450, 500, "INVENTARIO DE EQUIPO MEDICO")
     
-    # --- 2. DIBUJO DE LA TABLA ---
-    # Aquí empieza la tabla, justo debajo del título
+# --- 2. DIBUJO DE LA TABLA Y ENCABEZADOS ---
     y = 450
-    pos_x = [60, 110, 260, 370, 480, 590, 690] 
+    pos_x = [60, 110, 260, 370, 480, 580, 700] 
     headers = ["ID", "NOMBRE", "MARCA", "MODELO", "SERIE", "UBICACIÓN", "ESTADO"]
     
-    # Rectángulo del encabezado de tabla
-    c.rect(50, y, 700, 30)
+    c.rect(50, y, 700, 30) 
+    c.setFont("Helvetica-Bold", 10)
+    for i, h in enumerate(headers):
+        c.drawString(pos_x[i], y + 10, h)
         
     # --- 3. CONTENIDO ---
     y -= 25
     c.setFont("Helvetica", 9)
     for _, row in df.iterrows():
-        # Línea horizontal para cada fila
         c.line(50, y + 20, 750, y + 20)
         
-        datos = [str(row.get('id', '')), str(row.get('equipo', '')), 
-                 str(row.get('marca', '')), str(row.get('modelo', '')), 
-                 str(row.get('serie', '')), str(row.get('ubicacion', '')), 
-                 str(row.get('estado', ''))]
+        datos = [
+            str(row.get('id', '')),
+            str(row.get('equipo', '')),
+            str(row.get('marca', '')),
+            str(row.get('modelo', '')),
+            str(row.get('serie', '')),
+            str(row.get('ubicacion', '')),
+            str(row.get('estado', ''))
+        ]
         
         for i, val in enumerate(datos):
             c.drawString(pos_x[i], y + 5, val)
@@ -72,11 +77,16 @@ def generate_pdf_custom(df, titulo):
         # Nueva página si se llena
         if y < 50:
             c.showPage()
-            y = 500
+            y = 450
+            c.rect(50, y, 700, 30)
+            c.setFont("Helvetica-Bold", 10)
+            for i, h in enumerate(headers):
+                c.drawString(pos_x[i], y + 10, h)
+            y -= 25
+            c.setFont("Helvetica", 9)
             
     c.save()
     return buffer.getvalue()
-
 def export_module(df, nombre):
     st.write("---")
     st.subheader("📤 Exportar Datos")
