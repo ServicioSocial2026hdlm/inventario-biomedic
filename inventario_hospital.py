@@ -159,7 +159,9 @@ def generate_pdf_mtto(df):
     c.drawCentredString(450, 560, "HOSPITAL DE LA MUJER")
     c.drawCentredString(450, 540, "INGENIERÍA BIOMÉDICA")
     c.setFont("Helvetica-Bold", 14)
-    c.drawCentredString(450, 510, "REGISTRO DE MANTENIMIENTO (F-HM-BM-02)")
+    c.drawCentredString(450, 515, "REGISTRO DE MANTENIMIENTO")
+    c.setFont("Helvetica", 11)
+    c.drawCentredString(450, 498, "(F-HM-BM-02)")
 
     y = 460
     pos_x = [50, 160, 255, 330, 405, 475, 620]
@@ -211,9 +213,9 @@ def generate_pdf_mtto(df):
 # ==============================================================
 def generate_excel_bajas(df):
     output = io.BytesIO()
-    cols = ['id_equipo', 'fecha_baja', 'motivo', 'quien_autorizo', 'destino', 'folio_acta', 'valor_residual']
+    cols = ['equipo_info', 'fecha_baja', 'motivo', 'quien_autorizo', 'destino', 'folio_acta', 'valor_residual']
     df_f = df[cols].copy()
-    df_f.columns = ["ID EQUIPO", "FECHA BAJA", "MOTIVO", "AUTORIZÓ", "DESTINO", "FOLIO ACTA", "VALOR"]
+    df_f.columns = ["EQUIPO/SERIE", "FECHA BAJA", "MOTIVO", "AUTORIZÓ", "DESTINO", "FOLIO ACTA", "VALOR"]
 
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
         df_f.to_excel(writer, index=False, sheet_name='Bajas', startrow=6)
@@ -251,11 +253,13 @@ def generate_pdf_bajas(df):
     c.drawCentredString(450, 560, "HOSPITAL DE LA MUJER")
     c.drawCentredString(450, 540, "INGENIERÍA BIOMÉDICA")
     c.setFont("Helvetica-Bold", 14)
-    c.drawCentredString(450, 510, "REGISTRO DE BAJAS (F-HM-BM-03)")
+    c.drawCentredString(450, 515, "REGISTRO DE BAJAS")
+    c.setFont("Helvetica", 11)
+    c.drawCentredString(450, 498, "(F-HM-BM-03)")
 
     y = 460
     pos_x = [50, 130, 220, 330, 430, 540, 650]
-    headers = ["ID EQ.", "FECHA BAJA", "MOTIVO", "AUTORIZÓ", "DESTINO", "FOLIO ACTA", "VALOR"]
+    headers = ["EQUIPO/SERIE", "FECHA BAJA", "MOTIVO", "AUTORIZÓ", "DESTINO", "FOLIO ACTA", "VALOR"]
     c.rect(45, y, 705, 28)
     c.setFont("Helvetica-Bold", 9)
     for i, h in enumerate(headers):
@@ -272,7 +276,7 @@ def generate_pdf_bajas(df):
     for _, row in df.iterrows():
         c.line(45, y + 18, 750, y + 18)
         datos = [
-            str(row.get('id_equipo', '')),
+            str(row.get('equipo_info', ''))[:22],
             str(row.get('fecha_baja', '')),
             str(row.get('motivo', ''))[:18],
             str(row.get('quien_autorizo', ''))[:16],
@@ -433,8 +437,8 @@ elif choice == "Bajas":
                 try:
                     cur.execute("UPDATE inventario SET estado='Baja' WHERE id=%s", (int(equipo_sel['id']),))
                     cur.execute(
-                        "INSERT INTO bajas (id_equipo, fecha_baja, motivo, descripcion_motivo, quien_autorizo, destino, folio_acta, fecha_acta, valor_residual) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)",
-                        (int(equipo_sel['id']), datetime.date.today(), motivo, obs, autor, destino, folio, f_acta, val)
+                        "INSERT INTO bajas (equipo_info, fecha_baja, motivo, descripcion_motivo, quien_autorizo, destino, folio_acta, fecha_acta, valor_residual) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+                        (f"{equipo_sel['equipo']} - Serie: {equipo_sel['serie']}", datetime.date.today(), motivo, obs, autor, destino, folio, f_acta, val)
                     )
                     conn.commit()
                     st.success("Baja procesada")
