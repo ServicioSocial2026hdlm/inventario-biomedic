@@ -58,7 +58,7 @@ def generate_excel(df):
     return output.getvalue()
 
 
-def generate_pdf_custom(df, titulo):
+def generate_pdf_custom(df):
     buffer = io.BytesIO()
     c = canvas.Canvas(buffer, pagesize=landscape(letter))
 
