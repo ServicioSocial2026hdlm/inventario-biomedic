@@ -308,10 +308,30 @@ def generate_pdf_bajas(df):
 def export_module(df, nombre, excel_fn, pdf_fn):
     st.write("---")
     st.subheader("📤 Exportar Datos")
-    indices = st.multiselect("Selecciona registros para exportar:", df.index.tolist())
-    df_f = df.loc[indices] if indices else df
+
+    # --- Buscador ---
+    col_busq, col_campo = st.columns([3, 1])
+    texto = col_busq.text_input("🔍 Buscar:", placeholder="Escribe para filtrar...", label_visibility="collapsed")
+    columnas_texto = df.select_dtypes(include="object").columns.tolist()
+    campo = col_campo.selectbox("Campo", ["Todos"] + columnas_texto, label_visibility="collapsed")
+
+    if texto:
+        if campo == "Todos":
+            mask = df[columnas_texto].apply(lambda col: col.astype(str).str.contains(texto, case=False, na=False)).any(axis=1)
+        else:
+            mask = df[campo].astype(str).str.contains(texto, case=False, na=False)
+        df_filtrado = df[mask]
+    else:
+        df_filtrado = df
+
+    # --- Multiselect sobre resultados filtrados ---
+    opciones = df_filtrado.index.tolist()
+    indices = st.multiselect("Selecciona registros para exportar (vacío = todos los filtrados):", opciones,
+                             format_func=lambda i: " | ".join(str(df_filtrado.loc[i, c]) for c in columnas_texto[:3] if c in df_filtrado.columns))
+    df_f = df_filtrado.loc[indices] if indices else df_filtrado
 
     if not df_f.empty:
+        st.caption(f"{len(df_f)} registro(s) seleccionados para exportar")
         c1, c2 = st.columns(2)
         c1.download_button("📥 Exportar a Excel", excel_fn(df_f), f"{nombre}.xlsx", "application/vnd.ms-excel")
         c2.download_button("📄 Exportar a PDF",   pdf_fn(df_f),   f"{nombre}.pdf",  "application/pdf")
