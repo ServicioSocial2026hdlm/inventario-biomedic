@@ -3,6 +3,7 @@ import streamlit as st
 import pandas as pd
 import psycopg2
 import io
+import datetime
 import xlsxwriter
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import landscape, letter
@@ -10,7 +11,6 @@ from reportlab.lib.pagesizes import landscape, letter
 # Configuración de la página
 st.set_page_config(layout="wide", page_title="Sistema Biomédico HDLM")
 
-# --- DISEÑO Y ESTILO DE PÁGINA ---
 st.markdown("""
     <style>
     .stApp { background-color: #f4f7f6; }
@@ -19,104 +19,85 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- FUNCIONES DE BASE DE DATOS ---
-def get_connection(): 
+# --- CONEXIÓN ---
+def get_connection():
     return psycopg2.connect(**st.secrets["database"])
 
-# --- FUNCIONES DE REPORTES ---
+# ==============================================================
+# FUNCIONES DE EXPORTACIÓN — INVENTARIO
+# ==============================================================
 def generate_excel(df):
     output = io.BytesIO()
-    
-    # 1. Filtramos las columnas igual que antes
     columnas_deseadas = ['id', 'equipo', 'marca', 'modelo', 'serie', 'ubicacion', 'estado']
     df_filtrado = df[columnas_deseadas].copy()
     df_filtrado.columns = ["ID", "NOMBRE", "MARCA", "MODELO", "SERIE", "UBICACIÓN", "ESTADO"]
-    
+
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
         df_filtrado.to_excel(writer, index=False, sheet_name='Inventario', startrow=6)
-        
-        workbook = writer.book
-        worksheet = writer.sheets['Inventario']
-        
-        # 2. Formatos sin color de fondo (transparente/normal)
-        header_format = workbook.add_format({
-            'bold': True, 
-            'align': 'center', 
-            'valign': 'center',
-            'border': 1 # Solo dejamos el borde
-            # Quitamos 'fg_color' para que sea el fondo normal de Excel
-        })
-        
-        title_format = workbook.add_format({'bold': True, 'font_size': 14, 'align': 'center'})
-        subtitle_format = workbook.add_format({'bold': True, 'font_size': 12, 'align': 'center'})
-        
-        # 3. Títulos
-        worksheet.merge_range('A2:G2', 'HOSPITAL DE LA MUJER', title_format)
-        worksheet.merge_range('A3:G3', 'INGENIERÍA BIOMÉDICA', subtitle_format)
-        worksheet.merge_range('A4:G4', 'INVENTARIO DE EQUIPO MÉDICO', title_format)
-        worksheet.merge_range('A5:G5', '(F-HM-BM-01)', subtitle_format)
-        
-        # 4. Logo
+        wb = writer.book
+        ws = writer.sheets['Inventario']
+
+        header_format = wb.add_format({'bold': True, 'align': 'center', 'valign': 'center', 'border': 1})
+        title_format   = wb.add_format({'bold': True, 'font_size': 14, 'align': 'center'})
+        subtitle_format = wb.add_format({'bold': True, 'font_size': 12, 'align': 'center'})
+
+        ws.merge_range('A2:G2', 'HOSPITAL DE LA MUJER', title_format)
+        ws.merge_range('A3:G3', 'INGENIERÍA BIOMÉDICA', subtitle_format)
+        ws.merge_range('A4:G4', 'INVENTARIO DE EQUIPO MÉDICO', title_format)
+        ws.merge_range('A5:G5', '(F-HM-BM-01)', subtitle_format)
+
         try:
-            worksheet.insert_image('A1', 'issea.png', {'x_scale': 0.5, 'y_scale': 0.5})
+            ws.insert_image('A1', 'issea.png', {'x_scale': 0.5, 'y_scale': 0.5})
         except:
             pass
-            
-        # 5. Aplicar formato a las columnas
+
         for i, col in enumerate(df_filtrado.columns):
-            worksheet.set_column(i, i, 20)
-            worksheet.write(6, i, col, header_format) 
-            
-        # Nota: El REV-01 ya no está en el código, por lo que no aparecerá.
+            ws.set_column(i, i, 20)
+            ws.write(6, i, col, header_format)
 
     return output.getvalue()
+
+
 def generate_pdf_custom(df, titulo):
     buffer = io.BytesIO()
     c = canvas.Canvas(buffer, pagesize=landscape(letter))
-    
-    # --- 1. LOGO Y ENCABEZADO ---
+
     try:
         c.drawImage("issea.png", 50, 520, width=120, height=60)
     except:
         pass
-    
+
     c.setFont("Helvetica-Bold", 14)
     c.drawCentredString(450, 560, "HOSPITAL DE LA MUJER")
     c.drawCentredString(450, 540, "INGENIERÍA BIOMÉDICA")
-    
-    # Título principal más arriba
     c.setFont("Helvetica-Bold", 16)
     c.drawCentredString(450, 500, "INVENTARIO DE EQUIPO MEDICO")
-    
     c.setFont("Helvetica", 10)
     c.drawCentredString(450, 480, "(F-HM-BM-01)")
-    
-    # --- 2. DIBUJO DE LA TABLA ---
+
     y = 440
-    pos_x = [60, 110, 260, 370, 480, 580, 700] 
+    pos_x = [60, 110, 260, 370, 480, 580, 700]
     headers = ["ID", "NOMBRE", "MARCA", "MODELO", "SERIE", "UBICACIÓN", "ESTADO"]
-    c.rect(50, y, 700, 30) 
+    c.rect(50, y, 700, 30)
     c.setFont("Helvetica-Bold", 10)
     for i, h in enumerate(headers):
         c.drawString(pos_x[i], y + 10, h)
-        
-    # --- 3. CONTENIDO Y PIE DE PÁGINA ---
-    y -= 25
-    c.setFont("Helvetica", 9)
-    
+
     def draw_footer(canvas_obj):
         canvas_obj.setFont("Helvetica", 8)
         canvas_obj.drawRightString(750, 20, "REV-01")
-        
+
     draw_footer(c)
-    
+    y -= 25
+    c.setFont("Helvetica", 9)
+
     for _, row in df.iterrows():
         c.line(50, y + 20, 750, y + 20)
-        datos = [str(row.get('id', '')), str(row.get('equipo', '')), str(row.get('marca', '')), 
-                 str(row.get('modelo', '')), str(row.get('serie', '')), str(row.get('ubicacion', '')), 
+        datos = [str(row.get('id', '')), str(row.get('equipo', '')), str(row.get('marca', '')),
+                 str(row.get('modelo', '')), str(row.get('serie', '')), str(row.get('ubicacion', '')),
                  str(row.get('estado', ''))]
         for i, val in enumerate(datos):
-            c.drawString(pos_x[i], y + 5, val)
+            c.drawString(pos_x[i], y + 5, val[:20])
         y -= 25
         if y < 50:
             c.showPage()
@@ -128,22 +109,216 @@ def generate_pdf_custom(df, titulo):
                 c.drawString(pos_x[i], y + 10, h)
             y -= 25
             c.setFont("Helvetica", 9)
-            
+
     c.save()
     return buffer.getvalue()
-# --- IMPRESO ---    
-def export_module(df, nombre):
+
+
+# ==============================================================
+# FUNCIONES DE EXPORTACIÓN — MANTENIMIENTO
+# ==============================================================
+def generate_excel_mtto(df):
+    output = io.BytesIO()
+    cols = ['equipo_info', 'fecha_mantenimiento', 'tipo', 'tecnico', 'costo', 'descripcion', 'proximo_mantenimiento']
+    df_f = df[cols].copy()
+    df_f.columns = ["EQUIPO/SERIE", "FECHA", "TIPO", "TÉCNICO", "COSTO", "DESCRIPCIÓN", "PRÓX. MTTO"]
+
+    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+        df_f.to_excel(writer, index=False, sheet_name='Mtto', startrow=6)
+        wb = writer.book
+        ws = writer.sheets['Mtto']
+        h_f = wb.add_format({'bold': True, 'align': 'center', 'valign': 'center', 'border': 1})
+        t_f = wb.add_format({'bold': True, 'font_size': 14, 'align': 'center'})
+
+        ws.merge_range('A2:G2', 'HOSPITAL DE LA MUJER', t_f)
+        ws.merge_range('A3:G3', 'INGENIERÍA BIOMÉDICA', t_f)
+        ws.merge_range('A4:G4', 'REGISTRO DE MANTENIMIENTO (F-HM-BM-02)', t_f)
+
+        try:
+            ws.insert_image('A1', 'issea.png', {'x_scale': 0.5, 'y_scale': 0.5})
+        except:
+            pass
+
+        for i, col in enumerate(df_f.columns):
+            ws.set_column(i, i, 18)
+            ws.write(6, i, col, h_f)
+
+    return output.getvalue()
+
+
+def generate_pdf_mtto(df):
+    buffer = io.BytesIO()
+    c = canvas.Canvas(buffer, pagesize=landscape(letter))
+
+    try:
+        c.drawImage("issea.png", 50, 520, width=120, height=60)
+    except:
+        pass
+
+    c.setFont("Helvetica-Bold", 14)
+    c.drawCentredString(450, 560, "HOSPITAL DE LA MUJER")
+    c.drawCentredString(450, 540, "INGENIERÍA BIOMÉDICA")
+    c.setFont("Helvetica-Bold", 14)
+    c.drawCentredString(450, 510, "REGISTRO DE MANTENIMIENTO (F-HM-BM-02)")
+
+    y = 460
+    pos_x = [50, 160, 255, 330, 405, 475, 620]
+    headers = ["EQUIPO/SERIE", "FECHA", "TIPO", "TÉCNICO", "COSTO", "DESCRIPCIÓN", "PRÓX. MTTO"]
+    c.rect(45, y, 705, 28)
+    c.setFont("Helvetica-Bold", 9)
+    for i, h in enumerate(headers):
+        c.drawString(pos_x[i], y + 9, h)
+
+    def draw_footer(canvas_obj):
+        canvas_obj.setFont("Helvetica", 8)
+        canvas_obj.drawRightString(750, 20, "REV-01")
+
+    draw_footer(c)
+    y -= 22
+    c.setFont("Helvetica", 8)
+
+    for _, row in df.iterrows():
+        c.line(45, y + 18, 750, y + 18)
+        datos = [
+            str(row.get('equipo_info', ''))[:28],
+            str(row.get('fecha_mantenimiento', '')),
+            str(row.get('tipo', ''))[:14],
+            str(row.get('tecnico', ''))[:14],
+            str(row.get('costo', '')),
+            str(row.get('descripcion', ''))[:22],
+            str(row.get('proximo_mantenimiento', '')),
+        ]
+        for i, val in enumerate(datos):
+            c.drawString(pos_x[i], y + 4, val)
+        y -= 22
+        if y < 50:
+            c.showPage()
+            draw_footer(c)
+            y = 470
+            c.rect(45, y, 705, 28)
+            c.setFont("Helvetica-Bold", 9)
+            for i, h in enumerate(headers):
+                c.drawString(pos_x[i], y + 9, h)
+            y -= 22
+            c.setFont("Helvetica", 8)
+
+    c.save()
+    return buffer.getvalue()
+
+
+# ==============================================================
+# FUNCIONES DE EXPORTACIÓN — BAJAS
+# ==============================================================
+def generate_excel_bajas(df):
+    output = io.BytesIO()
+    cols = ['id_equipo', 'fecha_baja', 'motivo', 'quien_autorizo', 'destino', 'folio_acta', 'valor_residual']
+    df_f = df[cols].copy()
+    df_f.columns = ["ID EQUIPO", "FECHA BAJA", "MOTIVO", "AUTORIZÓ", "DESTINO", "FOLIO ACTA", "VALOR"]
+
+    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+        df_f.to_excel(writer, index=False, sheet_name='Bajas', startrow=6)
+        wb = writer.book
+        ws = writer.sheets['Bajas']
+        h_f = wb.add_format({'bold': True, 'align': 'center', 'valign': 'center', 'border': 1})
+        t_f = wb.add_format({'bold': True, 'font_size': 14, 'align': 'center'})
+
+        ws.merge_range('A2:G2', 'HOSPITAL DE LA MUJER', t_f)
+        ws.merge_range('A3:G3', 'INGENIERÍA BIOMÉDICA', t_f)
+        ws.merge_range('A4:G4', 'REGISTRO DE BAJAS (F-HM-BM-03)', t_f)
+
+        try:
+            ws.insert_image('A1', 'issea.png', {'x_scale': 0.5, 'y_scale': 0.5})
+        except:
+            pass
+
+        for i, col in enumerate(df_f.columns):
+            ws.set_column(i, i, 18)
+            ws.write(6, i, col, h_f)
+
+    return output.getvalue()
+
+
+def generate_pdf_bajas(df):
+    buffer = io.BytesIO()
+    c = canvas.Canvas(buffer, pagesize=landscape(letter))
+
+    try:
+        c.drawImage("issea.png", 50, 520, width=120, height=60)
+    except:
+        pass
+
+    c.setFont("Helvetica-Bold", 14)
+    c.drawCentredString(450, 560, "HOSPITAL DE LA MUJER")
+    c.drawCentredString(450, 540, "INGENIERÍA BIOMÉDICA")
+    c.setFont("Helvetica-Bold", 14)
+    c.drawCentredString(450, 510, "REGISTRO DE BAJAS (F-HM-BM-03)")
+
+    y = 460
+    pos_x = [50, 130, 220, 330, 430, 540, 650]
+    headers = ["ID EQ.", "FECHA BAJA", "MOTIVO", "AUTORIZÓ", "DESTINO", "FOLIO ACTA", "VALOR"]
+    c.rect(45, y, 705, 28)
+    c.setFont("Helvetica-Bold", 9)
+    for i, h in enumerate(headers):
+        c.drawString(pos_x[i], y + 9, h)
+
+    def draw_footer(canvas_obj):
+        canvas_obj.setFont("Helvetica", 8)
+        canvas_obj.drawRightString(750, 20, "REV-01")
+
+    draw_footer(c)
+    y -= 22
+    c.setFont("Helvetica", 8)
+
+    for _, row in df.iterrows():
+        c.line(45, y + 18, 750, y + 18)
+        datos = [
+            str(row.get('id_equipo', '')),
+            str(row.get('fecha_baja', '')),
+            str(row.get('motivo', ''))[:18],
+            str(row.get('quien_autorizo', ''))[:16],
+            str(row.get('destino', ''))[:16],
+            str(row.get('folio_acta', ''))[:14],
+            str(row.get('valor_residual', '')),
+        ]
+        for i, val in enumerate(datos):
+            c.drawString(pos_x[i], y + 4, val)
+        y -= 22
+        if y < 50:
+            c.showPage()
+            draw_footer(c)
+            y = 470
+            c.rect(45, y, 705, 28)
+            c.setFont("Helvetica-Bold", 9)
+            for i, h in enumerate(headers):
+                c.drawString(pos_x[i], y + 9, h)
+            y -= 22
+            c.setFont("Helvetica", 8)
+
+    c.save()
+    return buffer.getvalue()
+
+
+# ==============================================================
+# MÓDULO DE EXPORTACIÓN GENÉRICO
+# ==============================================================
+def export_module(df, nombre, excel_fn, pdf_fn):
     st.write("---")
     st.subheader("📤 Exportar Datos")
     indices = st.multiselect("Selecciona registros para exportar:", df.index.tolist())
     df_f = df.loc[indices] if indices else df
-    
+
     if not df_f.empty:
         c1, c2 = st.columns(2)
-        c1.download_button("📥 Exportar a Excel", generate_excel(df_f), f"{nombre}.xlsx", "application/vnd.ms-excel")
-        c2.download_button("📄 Exportar a PDF", generate_pdf_custom(df_f, nombre), f"{nombre}.pdf", "application/pdf")
-# --- SEGURIDAD ---
-if "authenticated" not in st.session_state: st.session_state.authenticated = False
+        c1.download_button("📥 Exportar a Excel", excel_fn(df_f), f"{nombre}.xlsx", "application/vnd.ms-excel")
+        c2.download_button("📄 Exportar a PDF",   pdf_fn(df_f),   f"{nombre}.pdf",  "application/pdf")
+
+
+# ==============================================================
+# SEGURIDAD
+# ==============================================================
+if "authenticated" not in st.session_state:
+    st.session_state.authenticated = False
+
 if not st.session_state.authenticated:
     st.title("Acceso al Sistema Biomédico")
     pwd = st.text_input("Contraseña:", type="password")
@@ -153,99 +328,127 @@ if not st.session_state.authenticated:
             st.rerun()
     st.stop()
 
-# --- INTERFAZ PRINCIPAL ---
+
+# ==============================================================
+# INTERFAZ PRINCIPAL
+# ==============================================================
 choice = st.sidebar.selectbox("Módulo", ["Inventario", "Mantenimiento", "Bajas"])
 
-def get_connection(): 
-    return psycopg2.connect(**st.secrets["database"])
-
+# ------ INVENTARIO ------
 if choice == "Inventario":
     st.header("Inventario de Equipos")
     with st.form("reg", clear_on_submit=True):
         c1, c2 = st.columns(2)
-        with c1: eq = st.text_input("Nombre del Equipo"); ma = st.text_input("Marca"); mo = st.text_input("Modelo")
-        with c2: se = st.text_input("Serie"); ub = st.text_input("Ubicación"); es = st.text_input("Estado")
+        with c1:
+            eq = st.text_input("Nombre del Equipo")
+            ma = st.text_input("Marca")
+            mo = st.text_input("Modelo")
+        with c2:
+            se = st.text_input("Serie")
+            ub = st.text_input("Ubicación")
+            es = st.text_input("Estado")
         if st.form_submit_button("Guardar"):
-            conn = get_connection(); cur = conn.cursor()
-            cur.execute("INSERT INTO inventario (equipo, marca, modelo, serie, ubicacion, estado) VALUES (%s,%s,%s,%s,%s,%s)", (eq, ma, mo, se, ub, es))
-            conn.commit(); conn.close(); st.rerun()
-    conn = get_connection(); df = pd.read_sql("SELECT * FROM inventario", conn); conn.close()
-    st.dataframe(df, use_container_width=True)
-    export_module(df, "Inventario_Equipos")
+            conn = get_connection()
+            cur  = conn.cursor()
+            cur.execute(
+                "INSERT INTO inventario (equipo, marca, modelo, serie, ubicacion, estado) VALUES (%s,%s,%s,%s,%s,%s)",
+                (eq, ma, mo, se, ub, es)
+            )
+            conn.commit()
+            conn.close()
+            st.rerun()
 
+    conn = get_connection()
+    df   = pd.read_sql("SELECT * FROM inventario", conn)
+    conn.close()
+    st.dataframe(df, use_container_width=True)
+    export_module(df, "Inventario_Equipos", generate_excel, generate_pdf_custom)
+
+
+# ------ MANTENIMIENTO ------
 elif choice == "Mantenimiento":
     st.header("Registro de Mantenimiento")
     with st.form("form_manto", clear_on_submit=True):
         c1, c2 = st.columns(2)
-        with c1: 
+        with c1:
             equipo = st.text_input("Nombre del Equipo")
-            serie = st.text_input("Serie del Equipo")
-            # Usamos date_input para asegurar el formato de fecha correcto
-            fecha = st.date_input("Fecha de Mantenimiento")
-        with c2: 
-            tipo = st.text_input("Tipo de Mantenimiento")
-            tec = st.text_input("Técnico")
+            serie  = st.text_input("Serie del Equipo")
+            fecha  = st.date_input("Fecha de Mantenimiento")
+        with c2:
+            tipo  = st.text_input("Tipo de Mantenimiento")
+            tec   = st.text_input("Técnico")
             costo = st.text_input("Costo")
         prox = st.date_input("Próximo mantenimiento")
         desc = st.text_area("Descripción detallada del trabajo")
-        
+
         if st.form_submit_button("Guardar Mantenimiento"):
             conn = get_connection()
-            cur = conn.cursor()
+            cur  = conn.cursor()
             try:
-                query = "INSERT INTO mantenimientos (equipo_info, fecha_mantenimiento, tipo, tecnico, costo, descripcion, proximo_mantenimiento) VALUES (%s, %s, %s, %s, %s, %s, %s)"
-                valores = (f"{equipo} - Serie: {serie}", fecha, tipo, tec, float(costo) if costo else 0.0, desc, prox)
-                
-                cur.execute(query, valores)
-                conn.commit() # Fuerza el guardado
-                
-                # VERIFICACIÓN: Consultamos inmediatamente después de insertar
-                cur.execute("SELECT count(*) FROM mantenimientos")
-                count = cur.fetchone()[0]
-                st.write(f"Total de registros en la tabla ahora: {count}")
-                
+                cur.execute(
+                    "INSERT INTO mantenimientos (equipo_info, fecha_mantenimiento, tipo, tecnico, costo, descripcion, proximo_mantenimiento) VALUES (%s,%s,%s,%s,%s,%s,%s)",
+                    (f"{equipo} - Serie: {serie}", fecha, tipo, tec, float(costo) if costo else 0.0, desc, prox)
+                )
+                conn.commit()
                 st.success("Guardado correctamente")
+                st.rerun()
             except Exception as e:
                 st.error(f"Error: {e}")
             finally:
                 cur.close()
                 conn.close()
 
+    conn  = get_connection()
+    df_mt = pd.read_sql("SELECT * FROM mantenimientos", conn)
+    conn.close()
+    st.dataframe(df_mt, use_container_width=True)
+    export_module(df_mt, "Registro_Mantenimiento", generate_excel_mtto, generate_pdf_mtto)
+
+
+# ------ BAJAS ------
 elif choice == "Bajas":
     st.header("Control de Bajas")
-    conn = get_connection(); df = pd.read_sql("SELECT * FROM inventario WHERE estado != 'Baja'", conn); conn.close()
-    
+    conn = get_connection()
+    df   = pd.read_sql("SELECT * FROM inventario WHERE estado != 'Baja'", conn)
+    conn.close()
+
     if not df.empty:
-        # Cambiamos "reg" por "form_baja" para que sea único
         with st.form("form_baja", clear_on_submit=True):
             seleccion = st.selectbox("Seleccione el equipo", df["equipo"] + " - " + df["serie"])
-            # Nota: Al usar clear_on_submit, debemos asegurarnos de que la lógica de guardado procese los datos antes de limpiar
             c1, c2 = st.columns(2)
-            with c1: 
+            with c1:
                 motivo = st.text_input("Motivo")
-                obs = st.text_area("Descripción")
-                autor = st.text_input("Autorizado por")
-            with c2: 
+                obs    = st.text_area("Descripción")
+                autor  = st.text_input("Autorizado por")
+            with c2:
                 destino = st.text_input("Destino")
-                folio = st.text_input("Folio")
-                f_acta = st.date_input("Fecha acta")
-                val = st.number_input("Valor residual", format="%.2f")
-            
+                folio   = st.text_input("Folio")
+                f_acta  = st.date_input("Fecha acta")
+                val     = st.number_input("Valor residual", format="%.2f")
+
             if st.form_submit_button("Confirmar Baja"):
-                # Obtenemos el equipo seleccionado justo antes de procesar
                 equipo_sel = df[df["equipo"] + " - " + df["serie"] == seleccion].iloc[0]
-                
-                conn = get_connection(); cur = conn.cursor()
-                cur.execute("UPDATE inventario SET estado='Baja' WHERE id=%s", (int(equipo_sel['id']),))
-                cur.execute("INSERT INTO bajas (id_equipo, fecha_baja, motivo, descripcion_motivo, quien_autorizo, destino, folio_acta, fecha_acta, valor_residual) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)", 
-                            (int(equipo_sel['id']), datetime.date.today(), motivo, obs, autor, destino, folio, f_acta, val))
-                conn.commit(); cur.close(); conn.close()
-                st.success("Baja procesada")
-                st.rerun() # Esto recargará la página y el formulario se limpiará
-    else: 
+                conn = get_connection()
+                cur  = conn.cursor()
+                try:
+                    cur.execute("UPDATE inventario SET estado='Baja' WHERE id=%s", (int(equipo_sel['id']),))
+                    cur.execute(
+                        "INSERT INTO bajas (id_equipo, fecha_baja, motivo, descripcion_motivo, quien_autorizo, destino, folio_acta, fecha_acta, valor_residual) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+                        (int(equipo_sel['id']), datetime.date.today(), motivo, obs, autor, destino, folio, f_acta, val)
+                    )
+                    conn.commit()
+                    st.success("Baja procesada")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error: {e}")
+                finally:
+                    cur.close()
+                    conn.close()
+    else:
         st.info("No hay equipos para dar de baja.")
-    
-    # Mostrar tabla de bajas históricas
-    conn = get_connection(); df_bajas = pd.read_sql("SELECT * FROM bajas", conn); conn.close()
+
+    conn      = get_connection()
+    df_bajas  = pd.read_sql("SELECT * FROM bajas", conn)
+    conn.close()
     st.dataframe(df_bajas, use_container_width=True)
-    export_module(df_bajas, "Reporte_Bajas")
+    export_module(df_bajas, "Reporte_Bajas", generate_excel_bajas, generate_pdf_bajas)
