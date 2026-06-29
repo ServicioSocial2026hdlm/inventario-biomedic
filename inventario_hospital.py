@@ -346,12 +346,20 @@ if "authenticated" not in st.session_state:
 if not st.session_state.authenticated:
     st.title("Acceso al Sistema Biomédico")
     pwd = st.text_input("Contraseña:", type="password")
+    
     if st.button("Ingresar"):
-        if "auth" in st.secrets and pwd == st.secrets["auth"]["password"]:
+        # Verificamos si Streamlit está leyendo el archivo secrets
+        if "auth" not in st.secrets:
+            st.error("❌ El sistema no detecta el archivo secrets.toml. Revisa que esté en la carpeta .streamlit y no termine en .txt")
+        # Verificamos la contraseña
+        elif pwd != st.secrets["auth"]["password"]:
+            st.error("❌ Contraseña incorrecta. Intenta de nuevo.")
+        # Si todo está bien, entra
+        else:
             st.session_state.authenticated = True
             st.rerun()
+            
     st.stop()
-
 
 # ==============================================================
 # INTERFAZ PRINCIPAL
