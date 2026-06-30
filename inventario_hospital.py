@@ -540,15 +540,14 @@ elif choice == "Consumibles":
             cant_cons = st.text_input("Cantidad")
         with c2:
             eq_comp = st.text_input("Equipo Compatible")
-            val_adq_cons = st.number_input("Valor de Adquisición", min_value=0.0, format="%.2f")
 
         if st.form_submit_button("Guardar Consumible"):
             conn = get_connection()
             cur  = conn.cursor()
             try:
                 cur.execute(
-                    "INSERT INTO consumibles (descripcion, cantidad, equipo_compatible, valor_adquisicion) VALUES (%s,%s,%s,%s)",
-                    (desc_cons, cant_cons, eq_comp, val_adq_cons)
+                    "INSERT INTO consumibles (descripcion, cantidad, equipo_compatible) VALUES (%s,%s,%s)",
+                    (desc_cons, cant_cons, eq_comp)
                 )
                 conn.commit()
                 st.success("Consumible guardado exitosamente")
