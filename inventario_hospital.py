@@ -28,9 +28,9 @@ def get_connection():
 # ==============================================================
 def generate_excel(df):
     output = io.BytesIO()
-    columnas_deseadas = ['id', 'equipo', 'marca', 'modelo', 'serie', 'ubicacion', 'estado']
+    columnas_deseadas = ['id', 'equipo', 'marca', 'modelo', 'serie', 'ubicacion', 'estado', 'valor_adquisicion']
     df_filtrado = df[columnas_deseadas].copy()
-    df_filtrado.columns = ["ID", "NOMBRE", "MARCA", "MODELO", "SERIE", "UBICACIÓN", "ESTADO"]
+    df_filtrado.columns = ["ID", "NOMBRE", "MARCA", "MODELO", "SERIE", "UBICACIÓN", "ESTADO", "VALOR ADQ."]
 
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
         df_filtrado.to_excel(writer, index=False, sheet_name='Inventario', startrow=6)
@@ -41,10 +41,10 @@ def generate_excel(df):
         title_format   = wb.add_format({'bold': True, 'font_size': 14, 'align': 'center'})
         subtitle_format = wb.add_format({'bold': True, 'font_size': 12, 'align': 'center'})
 
-        ws.merge_range('A2:G2', 'HOSPITAL DE LA MUJER', title_format)
-        ws.merge_range('A3:G3', 'INGENIERÍA BIOMÉDICA', subtitle_format)
-        ws.merge_range('A4:G4', 'INVENTARIO DE EQUIPO MÉDICO', title_format)
-        ws.merge_range('A5:G5', '(F-HM-BM-01)', subtitle_format)
+        ws.merge_range('A2:H2', 'HOSPITAL DE LA MUJER', title_format)
+        ws.merge_range('A3:H3', 'INGENIERÍA BIOMÉDICA', subtitle_format)
+        ws.merge_range('A4:H4', 'INVENTARIO DE EQUIPO MÉDICO', title_format)
+        ws.merge_range('A5:H5', '(F-HM-BM-01)', subtitle_format)
 
         try:
             ws.insert_image('A1', 'issea.png', {'x_scale': 0.5, 'y_scale': 0.5})
@@ -52,7 +52,7 @@ def generate_excel(df):
             pass
 
         for i, col in enumerate(df_filtrado.columns):
-            ws.set_column(i, i, 20)
+            ws.set_column(i, i, 18)
             ws.write(6, i, col, header_format)
 
     return output.getvalue()
@@ -76,9 +76,9 @@ def generate_pdf_custom(df):
     c.drawCentredString(450, 480, "(F-HM-BM-01)")
 
     y = 440
-    pos_x = [60, 110, 260, 370, 480, 580, 700]
-    headers = ["ID", "NOMBRE", "MARCA", "MODELO", "SERIE", "UBICACIÓN", "ESTADO"]
-    c.rect(50, y, 700, 30)
+    pos_x = [50, 90, 200, 290, 380, 470, 570, 670]
+    headers = ["ID", "NOMBRE", "MARCA", "MODELO", "SERIE", "UBICACIÓN", "ESTADO", "VALOR"]
+    c.rect(45, y, 705, 30)
     c.setFont("Helvetica-Bold", 10)
     for i, h in enumerate(headers):
         c.drawString(pos_x[i], y + 10, h)
@@ -92,18 +92,20 @@ def generate_pdf_custom(df):
     c.setFont("Helvetica", 9)
 
     for _, row in df.iterrows():
-        c.line(50, y + 20, 750, y + 20)
-        datos = [str(row.get('id', '')), str(row.get('equipo', '')), str(row.get('marca', '')),
-                 str(row.get('modelo', '')), str(row.get('serie', '')), str(row.get('ubicacion', '')),
-                 str(row.get('estado', ''))]
+        c.line(45, y + 20, 750, y + 20)
+        datos = [
+            str(row.get('id', '')), str(row.get('equipo', ''))[:20], str(row.get('marca', ''))[:15],
+            str(row.get('modelo', ''))[:15], str(row.get('serie', ''))[:15], str(row.get('ubicacion', ''))[:18],
+            str(row.get('estado', ''))[:15], str(row.get('valor_adquisicion', ''))
+        ]
         for i, val in enumerate(datos):
-            c.drawString(pos_x[i], y + 5, val[:20])
+            c.drawString(pos_x[i], y + 5, val)
         y -= 25
         if y < 50:
             c.showPage()
             draw_footer(c)
             y = 450
-            c.rect(50, y, 700, 30)
+            c.rect(45, y, 705, 30)
             c.setFont("Helvetica-Bold", 10)
             for i, h in enumerate(headers):
                 c.drawString(pos_x[i], y + 10, h)
@@ -303,6 +305,98 @@ def generate_pdf_bajas(df):
 
 
 # ==============================================================
+# FUNCIONES DE EXPORTACIÓN — CONSUMIBLES
+# ==============================================================
+def generate_excel_consumibles(df):
+    output = io.BytesIO()
+    cols = ['id', 'descripcion', 'cantidad', 'equipo_compatible', 'valor_adquisicion']
+    df_f = df[cols].copy()
+    df_f.columns = ["ID", "DESCRIPCIÓN", "CANTIDAD", "EQUIPO COMPATIBLE", "VALOR ADQ."]
+
+    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+        df_f.to_excel(writer, index=False, sheet_name='Consumibles', startrow=6)
+        wb = writer.book
+        ws = writer.sheets['Consumibles']
+        h_f = wb.add_format({'bold': True, 'align': 'center', 'valign': 'center', 'border': 1})
+        t_f = wb.add_format({'bold': True, 'font_size': 14, 'align': 'center'})
+
+        ws.merge_range('A2:E2', 'HOSPITAL DE LA MUJER', t_f)
+        ws.merge_range('A3:E3', 'INGENIERÍA BIOMÉDICA', t_f)
+        ws.merge_range('A4:E4', 'CONTROL DE CONSUMIBLES (F-HM-BM-04)', t_f)
+
+        try:
+            ws.insert_image('A1', 'issea.png', {'x_scale': 0.5, 'y_scale': 0.5})
+        except:
+            pass
+
+        for i, col in enumerate(df_f.columns):
+            ws.set_column(i, i, 22)
+            ws.write(6, i, col, h_f)
+
+    return output.getvalue()
+
+
+def generate_pdf_consumibles(df):
+    buffer = io.BytesIO()
+    c = canvas.Canvas(buffer, pagesize=landscape(letter))
+
+    try:
+        c.drawImage("issea.png", 50, 520, width=120, height=60)
+    except:
+        pass
+
+    c.setFont("Helvetica-Bold", 14)
+    c.drawCentredString(450, 560, "HOSPITAL DE LA MUJER")
+    c.drawCentredString(450, 540, "INGENIERÍA BIOMÉDICA")
+    c.setFont("Helvetica-Bold", 14)
+    c.drawCentredString(450, 515, "CONTROL DE CONSUMIBLES")
+    c.setFont("Helvetica", 11)
+    c.drawCentredString(450, 498, "(F-HM-BM-04)")
+
+    y = 460
+    pos_x = [60, 120, 340, 460, 640]
+    headers = ["ID", "DESCRIPCIÓN", "CANTIDAD", "EQUIPO COMPATIBLE", "VALOR"]
+    c.rect(45, y, 705, 28)
+    c.setFont("Helvetica-Bold", 10)
+    for i, h in enumerate(headers):
+        c.drawString(pos_x[i], y + 9, h)
+
+    def draw_footer(canvas_obj):
+        canvas_obj.setFont("Helvetica", 8)
+        canvas_obj.drawRightString(750, 20, "REV-01")
+
+    draw_footer(c)
+    y -= 22
+    c.setFont("Helvetica", 9)
+
+    for _, row in df.iterrows():
+        c.line(45, y + 18, 750, y + 18)
+        datos = [
+            str(row.get('id', '')),
+            str(row.get('descripcion', ''))[:35],
+            str(row.get('cantidad', ''))[:15],
+            str(row.get('equipo_compatible', ''))[:25],
+            str(row.get('valor_adquisicion', ''))
+        ]
+        for i, val in enumerate(datos):
+            c.drawString(pos_x[i], y + 4, val)
+        y -= 22
+        if y < 50:
+            c.showPage()
+            draw_footer(c)
+            y = 470
+            c.rect(45, y, 705, 28)
+            c.setFont("Helvetica-Bold", 10)
+            for i, h in enumerate(headers):
+                c.drawString(pos_x[i], y + 9, h)
+            y -= 22
+            c.setFont("Helvetica", 9)
+
+    c.save()
+    return buffer.getvalue()
+
+
+# ==============================================================
 # MÓDULO DE EXPORTACIÓN GENÉRICO
 # ==============================================================
 def export_module(df, nombre, excel_fn, pdf_fn):
@@ -311,9 +405,9 @@ def export_module(df, nombre, excel_fn, pdf_fn):
 
     # --- Buscador ---
     col_busq, col_campo = st.columns([3, 1])
-    texto = col_busq.text_input("🔍 Buscar:", placeholder="Escribe para filtrar...", label_visibility="collapsed")
+    texto = col_busq.text_input("🔍 Buscar en " + nombre.replace("_", " ") + ":", placeholder="Escribe para filtrar...", label_visibility="collapsed")
     columnas_texto = df.select_dtypes(include="object").columns.tolist()
-    campo = col_campo.selectbox("Campo", ["Todos"] + columnas_texto, label_visibility="collapsed")
+    campo = col_campo.selectbox("Campo en " + nombre, ["Todos"] + columnas_texto, label_visibility="collapsed")
 
     if texto:
         if campo == "Todos":
@@ -326,7 +420,7 @@ def export_module(df, nombre, excel_fn, pdf_fn):
 
     # --- Multiselect sobre resultados filtrados ---
     opciones = df_filtrado.index.tolist()
-    indices = st.multiselect("Selecciona registros para exportar (vacío = todos los filtrados):", opciones,
+    indices = st.multiselect("Selecciona registros para exportar en " + nombre.replace("_", " ") + " (vacío = todos los filtrados):", opciones,
                              format_func=lambda i: " | ".join(str(df_filtrado.loc[i, c]) for c in columnas_texto[:3] if c in df_filtrado.columns))
     df_f = df_filtrado.loc[indices] if indices else df_filtrado
 
@@ -348,13 +442,10 @@ if not st.session_state.authenticated:
     pwd = st.text_input("Contraseña:", type="password")
     
     if st.button("Ingresar"):
-        # Verificamos si Streamlit está leyendo el archivo secrets
         if "auth" not in st.secrets:
             st.error("❌ El sistema no detecta el archivo secrets.toml. Revisa que esté en la carpeta .streamlit y no termine en .txt")
-        # Verificamos la contraseña
         elif pwd != st.secrets["auth"]["password"]:
             st.error("❌ Contraseña incorrecta. Intenta de nuevo.")
-        # Si todo está bien, entra
         else:
             st.session_state.authenticated = True
             st.rerun()
@@ -364,7 +455,7 @@ if not st.session_state.authenticated:
 # ==============================================================
 # INTERFAZ PRINCIPAL
 # ==============================================================
-choice = st.sidebar.selectbox("Módulo", ["Inventario", "Mantenimiento", "Bajas"])
+choice = st.sidebar.selectbox("Módulo", ["Inventario", "Mantenimiento", "Consumibles", "Bajas"])
 
 # ------ INVENTARIO ------
 if choice == "Inventario":
@@ -379,12 +470,14 @@ if choice == "Inventario":
             se = st.text_input("Serie")
             ub = st.text_input("Ubicación")
             es = st.text_input("Estado")
+        val_adq = st.number_input("Valor de Adquisición", min_value=0.0, format="%.2f")
+        
         if st.form_submit_button("Guardar"):
             conn = get_connection()
             cur  = conn.cursor()
             cur.execute(
-                "INSERT INTO inventario (equipo, marca, modelo, serie, ubicacion, estado) VALUES (%s,%s,%s,%s,%s,%s)",
-                (eq, ma, mo, se, ub, es)
+                "INSERT INTO inventario (equipo, marca, modelo, serie, ubicacion, estado, valor_adquisicion) VALUES (%s,%s,%s,%s,%s,%s,%s)",
+                (eq, ma, mo, se, ub, es, val_adq)
             )
             conn.commit()
             conn.close()
@@ -435,6 +528,42 @@ elif choice == "Mantenimiento":
     conn.close()
     st.dataframe(df_mt, use_container_width=True)
     export_module(df_mt, "Registro_Mantenimiento", generate_excel_mtto, generate_pdf_mtto)
+
+
+# ------ CONSUMIBLES ------
+elif choice == "Consumibles":
+    st.header("Control de Consumibles")
+    with st.form("form_consumibles", clear_on_submit=True):
+        c1, c2 = st.columns(2)
+        with c1:
+            desc_cons = st.text_area("Descripción del Consumible")
+            cant_cons = st.text_input("Cantidad")
+        with c2:
+            eq_comp = st.text_input("Equipo Compatible")
+            val_adq_cons = st.number_input("Valor de Adquisición", min_value=0.0, format="%.2f")
+
+        if st.form_submit_button("Guardar Consumible"):
+            conn = get_connection()
+            cur  = conn.cursor()
+            try:
+                cur.execute(
+                    "INSERT INTO consumibles (descripcion, cantidad, equipo_compatible, valor_adquisicion) VALUES (%s,%s,%s,%s)",
+                    (desc_cons, cant_cons, eq_comp, val_adq_cons)
+                )
+                conn.commit()
+                st.success("Consumible guardado exitosamente")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Error: {e}")
+            finally:
+                cur.close()
+                conn.close()
+
+    conn = get_connection()
+    df_cs = pd.read_sql("SELECT * FROM consumibles", conn)
+    conn.close()
+    st.dataframe(df_cs, use_container_width=True)
+    export_module(df_cs, "Control_Consumibles", generate_excel_consumibles, generate_pdf_consumibles)
 
 
 # ------ BAJAS ------
