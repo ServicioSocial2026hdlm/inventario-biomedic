@@ -309,9 +309,9 @@ def generate_pdf_bajas(df):
 # ==============================================================
 def generate_excel_consumibles(df):
     output = io.BytesIO()
-    cols = ['id', 'descripcion', 'cantidad', 'equipo_compatible', 'valor_adquisicion']
+    cols = ['id', 'descripcion', 'cantidad', 'equipo_compatible']
     df_f = df[cols].copy()
-    df_f.columns = ["ID", "DESCRIPCIÓN", "CANTIDAD", "EQUIPO COMPATIBLE", "VALOR ADQ."]
+    df_f.columns = ["ID", "DESCRIPCIÓN", "CANTIDAD", "EQUIPO COMPATIBLE"]
 
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
         df_f.to_excel(writer, index=False, sheet_name='Consumibles', startrow=6)
@@ -375,8 +375,8 @@ def generate_pdf_consumibles(df):
             str(row.get('id', '')),
             str(row.get('descripcion', ''))[:35],
             str(row.get('cantidad', ''))[:15],
-            str(row.get('equipo_compatible', ''))[:25],
-            str(row.get('valor_adquisicion', ''))
+            str(row.get('equipo_compatible', ''))[:25]
+            
         ]
         for i, val in enumerate(datos):
             c.drawString(pos_x[i], y + 4, val)
